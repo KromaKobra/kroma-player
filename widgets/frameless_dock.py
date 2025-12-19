@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
     QDockWidget, QWidget, QVBoxLayout, QLabel, QToolButton,
     QHBoxLayout, QSizePolicy
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QIcon, QPainterPath, QRegion
 from .rounded_card import RoundedCard
 
@@ -74,33 +74,27 @@ class CustomTitleBar(QWidget):
         self._drag_pos = None
         super().mouseReleaseEvent(ev)
 
-
 class FramelessDock(QDockWidget):
     def __init__(self, title: str, theme, parent=None):
         super().__init__(title, parent)
         self.theme = theme
 
-        # hide native title and use our own controls
-        self.setWindowTitle("")
-        self.setFeatures(QDockWidget.DockWidgetClosable
-                         | QDockWidget.DockWidgetMovable
-                         | QDockWidget.DockWidgetFloatable)
+        # remove native title bar (removes close / undock buttons)
+        self.setTitleBarWidget(QWidget())
 
-        # create rounded card and layout
+        # Still allow moving/floatable behavior (features control behavior,
+        # titlebar widget controls visible buttons)
+        self.setFeatures(
+            QDockWidget.DockWidgetMovable
+            | QDockWidget.DockWidgetFloatable
+            | QDockWidget.DockWidgetClosable
+        )
+
+        # create rounded card and layout (kept your original structure)
         self.card = RoundedCard(theme)
         self.layout = QVBoxLayout(self.card)
         self.layout.setContentsMargins(10, 6, 10, 10)
         self.layout.setSpacing(6)
-
-        # custom title bar (added into card)
-        self.titlebar = CustomTitleBar(self, title, theme)
-        self.layout.addWidget(self.titlebar)
-
-        # separator line
-        sep = QLabel()
-        sep.setFixedHeight(1)
-        sep.setStyleSheet("background: rgba(255,255,255,0.02);")
-        self.layout.addWidget(sep)
 
         # inner content container
         self.inner = QWidget(self.card)
@@ -111,12 +105,19 @@ class FramelessDock(QDockWidget):
 
         self.setWidget(self.card)
 
-        # connect top-level (floating) changes
+        # make the dock widget itself translucent background where needed
+        self.setAttribute(Qt.WA_TranslucentBackground, False)
+
+        # connect to floating/docked changes
         self.topLevelChanged.connect(self._on_top_level_changed)
 
-    def set_content_widget(self, widget):
-        # clear current layout of inner and add widget
+        # ensure titlebar is removed even after reparenting; keep a default empty widget
+        self.setTitleBarWidget(QWidget())
+
+    def set_content_widget(self, widget: QWidget):
+        """Replace inner content with widget."""
         l = self.inner.layout()
+        # clear
         while l.count():
             item = l.takeAt(0)
             if item.widget():
@@ -124,37 +125,56 @@ class FramelessDock(QDockWidget):
         l.addWidget(widget)
 
     def _apply_mask_to_window(self):
+        """Apply rounded mask to the top-level (floating) window."""
         top = self.window()
         if top is None:
             return
         radius = int(getattr(self.theme, "inner_radius", 12))
+        rect = top.rect()
+        if rect.isEmpty():
+            return
         path = QPainterPath()
-        path.addRoundedRect(top.rect(), radius, radius)
-        region = path.toFillPolygon().toPolygon()
-        top.setMask(QRegion(region))
+        path.addRoundedRect(rect, radius, radius)
+        region = QRegion(path.toFillPolygon().toPolygon())
+        try:
+            top.setMask(region)
+        except Exception:
+            # some platforms may not like setMask in some states; ignore
+            pass
 
     def _on_top_level_changed(self, floating: bool):
-        # When floating = True => top-level window. Remove native frame & make translucent.
+        """
+        When floating==True the dock becomes a top-level window.
+        Make that top-level window frameless, translucent and apply a rounded mask.
+        When docked again, clear translucency and mask so the main window frame remains.
+        """
         top = self.window()
+        if top is None:
+            return
+
         if floating:
-            flags = (Qt.Window | Qt.FramelessWindowHint | Qt.Tool)
-            self.setWindowFlags(flags)
-            # translucency for rounded corners
+            # Make the floating top-level window frameless and tool-like so it doesn't
+            # get a regular window titlebar from the OS.
+            # IMPORTANT: change flags on the top-level window object, then show() to apply.
+            top.setWindowFlags(Qt.Window | Qt.FramelessWindowHint | Qt.Tool)
+            top.setAttribute(Qt.WA_TranslucentBackground, True)
             self.setAttribute(Qt.WA_TranslucentBackground, True)
-            if top:
-                top.setAttribute(Qt.WA_TranslucentBackground, True)
-            # re-show to apply flags
-            self.show()
-            # apply mask so OS doesn't draw rectangular frame edges
-            self._apply_mask_to_window()
+
+            # show to apply flags; schedule mask application on next event loop turn
+            top.show()
+            QTimer.singleShot(0, self._apply_mask_to_window)
         else:
-            # docked back: remove translucency and clear mask
+            # docked back into the main window: restore regular widget flags and clear mask
+            try:
+                # Clear mask and translucency on top-level container (if any).
+                top.clearMask()
+            except Exception:
+                pass
+            top.setAttribute(Qt.WA_TranslucentBackground, False)
             self.setAttribute(Qt.WA_TranslucentBackground, False)
-            if top:
-                top.setAttribute(Qt.WA_TranslucentBackground, False)
-                try:
-                    top.clearMask()
-                except Exception:
-                    pass
-            # ensure flags refreshed
-            self.show()
+
+            # Reset flags for child widget so it behaves as a normal dock widget inside the main window
+            # Use Qt.Widget to indicate it's not a standalone top-level window.
+            top.setWindowFlags(Qt.Widget)
+            top.show()
+

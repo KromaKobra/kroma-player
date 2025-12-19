@@ -13,7 +13,7 @@ class Theme:
 
     # Radii / sizes
     border_radius: int = 18   # outer board radius
-    inner_radius: int = 12    # dock card radius
+    inner_radius: int = 24    # dock card radius
     shadow_blur: int = 20
     icon_size: int = 20
 

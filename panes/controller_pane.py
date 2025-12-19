@@ -14,12 +14,12 @@ class ControllerPane(QWidget):
         layout.setSpacing(10)
         layout.addStretch(1)
 
-        res_dir = os.path.join(os.path.dirname(__file__), "..", "resources")
+        res_dir = os.path.join(os.path.dirname(__file__), "..", "graphics")
         def icon(name):
             return QIcon(os.path.join(res_dir, name))
 
         btn_prev = QToolButton()
-        btn_prev.setIcon(icon("menu.svg"))
+        btn_prev.setIcon(icon("prev.svg"))
         btn_prev.setAutoRaise(True)
         btn_prev.setIconSize(QSize(theme.icon_size, theme.icon_size))
         layout.addWidget(btn_prev)
@@ -31,7 +31,7 @@ class ControllerPane(QWidget):
         layout.addWidget(btn_play)
 
         btn_next = QToolButton()
-        btn_next.setIcon(icon("menu.svg"))
+        btn_next.setIcon(icon("next.svg"))
         btn_next.setAutoRaise(True)
         btn_next.setIconSize(QSize(theme.icon_size, theme.icon_size))
         layout.addWidget(btn_next)

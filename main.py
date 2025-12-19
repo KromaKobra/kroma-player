@@ -1,7 +1,7 @@
 # main.py - entrypoint
 
 import sys
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout
 from app.theme import Theme
 from app.style import apply_global_style
 from panes.playlist_pane import PlaylistPane
@@ -20,26 +20,18 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Kroma Player")
         self.resize(1200, 760)
 
-        # central content
+        margin_container = QWidget()
+        layout = QHBoxLayout(margin_container)
+        layout.setContentsMargins(50, 50, 50, 50)
+
         central = QWidget()
         central.setObjectName("central_widget")
-        layout = QHBoxLayout(central)
-        layout.setContentsMargins(18, 18, 18, 18)
+        layout.addWidget(central)
+
+        self.setCentralWidget(margin_container)
 
         # an empty board (will show background)
         layout.addStretch(1)
-        self.setCentralWidget(central)
-
-        # create docks
-        # playlist_dock = FramelessDock("Playlist", theme, self)
-        # playlist_dock.set_content_widget(PlaylistPane(theme))
-        # self.addDockWidget(Qt.LeftDockWidgetArea, playlist_dock)
-        # playlist_dock.setMinimumWidth(260)
-
-        # lyrics_dock = FramelessDock("Lyrics", theme, self)
-        # lyrics_dock.set_content_widget(LyricsPane(theme))
-        # self.addDockWidget(Qt.RightDockWidgetArea, lyrics_dock)
-        # lyrics_dock.setMinimumWidth(300)
 
         controller_dock = FramelessDock("Controls", theme, self)
         controller_dock.set_content_widget(ControllerPane(theme))
