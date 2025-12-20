@@ -1,7 +1,7 @@
 # main.py - entrypoint
 
 import sys
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout
+from PySide6.QtWidgets import QDockWidget, QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout
 from app.theme import Theme
 from app.style import apply_global_style
 from panes.playlist_pane import PlaylistPane
@@ -9,29 +9,35 @@ from panes.lyrics_pane import LyricsPane
 from panes.controller_pane import ControllerPane
 from widgets.frameless_dock import FramelessDock
 
-# Variables for registry setting saves
-#APP_BRAND = "Kroma"
-#APP_NAME = "KromaPlayer"
+
+class AppWindow(QWidget):
+    def __init__(self, theme: Theme):
+        super().__init__()
+        self.theme = theme
+        self.resize(1200, 760)
+        self.setWindowTitle("Kroma Player")
+
+        margin_layout = QHBoxLayout(self)
+        margin_layout.setContentsMargins(50, 50, 50, 50)
+
+        main_window = MainWindow(theme)
+        margin_layout.addWidget(main_window)
+
 
 class MainWindow(QMainWindow):
     def __init__(self, theme: Theme):
         super().__init__()
         self.theme = theme
-        self.setWindowTitle("Kroma Player")
-        self.resize(1200, 760)
-
-        margin_container = QWidget()
-        layout = QHBoxLayout(margin_container)
-        layout.setContentsMargins(50, 50, 50, 50)
 
         central = QWidget()
         central.setObjectName("central_widget")
-        layout.addWidget(central)
+        layout = QHBoxLayout(central)
+        layout.setContentsMargins(0, 0, 0, 0)
 
-        self.setCentralWidget(margin_container)
+        self.setCentralWidget(central)
 
         # an empty board (will show background)
-        layout.addStretch(1)
+        #layout.addStretch(1)
 
         controller_dock = FramelessDock("Controls", theme, self)
         controller_dock.set_content_widget(ControllerPane(theme))
@@ -39,11 +45,6 @@ class MainWindow(QMainWindow):
         controller_dock.setMaximumHeight(140)
 
     def closeEvent(self, event):
-        # Save settings on close
-        #from PySide6.QtCore import QSettings
-        #settings = QSettings(APP_BRAND, APP_NAME)
-        #settings.setValue("mainwindow/geometry", self.saveGeometry())
-        #settings.setValue("mainwindow/state", self.saveState())
         super().closeEvent(event)
 
 
@@ -58,10 +59,7 @@ if __name__ == "__main__":
     # apply global stylesheet
     apply_global_style(app, theme)
 
-    w = MainWindow(theme)
-    # restore geometry and state settings
-    #from app.settings_utils import safe_restore_geometry_and_state
-    #safe_restore_geometry_and_state(w, APP_BRAND, APP_NAME)
+    app_window = AppWindow(theme)
 
-    w.show()
+    app_window.show()
     sys.exit(app.exec())
