@@ -6,12 +6,12 @@ def apply_global_style(app: QApplication, theme: Any):
     """Apply formatted global stylesheet using theme values."""
     tpl = f"""
     QWidget#central_widget {{
-        background: {theme.bg_color};
+        background: {theme.tmp};
     }}
 
     /* Root background for central board */
     .board {{
-        background: {theme.board_color};
+        background: {theme.system};
         border-radius: {theme.border_radius}px;
     }}
 

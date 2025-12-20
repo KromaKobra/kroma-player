@@ -4,8 +4,8 @@ from dataclasses import dataclass
 @dataclass
 class Theme:
     # Colors (all hex strings)
-    bg_color: str = "#0f1720"
-    board_color: str = "#0f1720"
+    system: str = "#171215"
+    tmp: str = "#747474"
     dock_color: str = "#0b1220"
     accent: str = "#1f6feb"
     text: str = "#e6eef8"

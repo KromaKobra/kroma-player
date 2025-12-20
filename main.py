@@ -1,6 +1,7 @@
 # main.py - entrypoint
 
 import sys
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QDockWidget, QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout
 from app.theme import Theme
 from app.style import apply_global_style
@@ -8,6 +9,7 @@ from panes.playlist_pane import PlaylistPane
 from panes.lyrics_pane import LyricsPane
 from panes.controller_pane import ControllerPane
 from widgets.frameless_dock import FramelessDock
+from widgets.app_boarder import BorderOverlay
 
 
 class AppWindow(QWidget):
@@ -18,10 +20,20 @@ class AppWindow(QWidget):
         self.setWindowTitle("Kroma Player")
 
         margin_layout = QHBoxLayout(self)
-        margin_layout.setContentsMargins(50, 50, 50, 50)
+        margin_layout.setContentsMargins(30, 30, 30, 30)
 
-        main_window = MainWindow(theme)
-        margin_layout.addWidget(main_window)
+        self.main_window = MainWindow(theme)
+        margin_layout.addWidget(self.main_window)
+
+        self.border_overlay = BorderOverlay(
+            parent=self,
+            target=self.main_window,
+            outer_expand=20,
+            inset_from_margin=6,
+            radius=24,
+            pen_width=6,
+            color=QColor(0, 0, 0)
+        )
 
 
 class MainWindow(QMainWindow):
