@@ -9,18 +9,18 @@ from panes.playlist_pane import PlaylistPane
 from panes.lyrics_pane import LyricsPane
 from panes.controller_pane import ControllerPane
 from widgets.frameless_dock import FramelessDock
-from widgets.app_boarder import BorderOverlay
+from widgets.app_border import BorderOverlay
 
 
 class AppWindow(QWidget):
     def __init__(self, theme: Theme):
         super().__init__()
-        self.theme = theme
         self.resize(1200, 760)
         self.setWindowTitle("Kroma Player")
 
         margin_layout = QHBoxLayout(self)
-        margin_layout.setContentsMargins(30, 30, 30, 30)
+        margins = getattr(theme, "app_margins")
+        margin_layout.setContentsMargins(margins, margins, margins, margins)
 
         self.main_window = MainWindow(theme)
         margin_layout.addWidget(self.main_window)
@@ -28,11 +28,7 @@ class AppWindow(QWidget):
         self.border_overlay = BorderOverlay(
             parent=self,
             target=self.main_window,
-            outer_expand=20,
-            inset_from_margin=6,
-            radius=24,
-            pen_width=6,
-            color=QColor(0, 0, 0)
+            theme=theme
         )
 
 

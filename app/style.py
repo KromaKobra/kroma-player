@@ -8,36 +8,5 @@ def apply_global_style(app: QApplication, theme: Any):
     QWidget#central_widget {{
         background: {theme.tmp};
     }}
-
-    /* Root background for central board */
-    .board {{
-        background: {theme.system};
-        border-radius: {theme.border_radius}px;
-    }}
-
-    /* Generic dock card style (for inner widgets if needed) */
-    .dock-card {{
-        background: {theme.dock_color};
-        color: {theme.text};
-        border-radius: {theme.inner_radius}px;
-        padding: 8px;
-    }}
-
-    QLabel, QToolButton, QPushButton {{
-        color: {theme.text};
-    }}
-
-    /* small subtle text */
-    .subtle {{
-        color: {theme.subtle};
-    }}
-
-    /* accent button */
-    .dock-accent {{
-        background: {theme.accent};
-        color: white;
-        border-radius: 8px;
-        padding: 6px 12px;
-    }}
     """
     app.setStyleSheet(tpl)

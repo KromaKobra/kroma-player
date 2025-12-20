@@ -4,19 +4,16 @@ from PySide6.QtGui import QPainter, QPen, QColor, QPainterPath
 from PySide6.QtWidgets import QWidget
 
 class BorderOverlay(QWidget):
-    def __init__(self, parent: QWidget, target: QWidget,
-                 outer_expand: int = 16,
-                 inset_from_margin: int = 12,
-                 radius: int = 14,
-                 pen_width: int = 6,
-                 color: QColor = QColor(0, 0, 0)):
+    def __init__(self, parent: QWidget, target: QWidget, theme):
         super().__init__(parent)
         self.target = target
-        self.outer_expand = outer_expand
-        self.inset_from_margin = inset_from_margin
-        self.radius = radius
-        self.pen_width = pen_width
-        self.color = color
+        self.theme = theme
+        self.outer_expand = int(getattr(self.theme, "app_padding"))
+        self.inset_from_margin = 0
+        self.radius = int(getattr(theme, "dock_radius")) + self.outer_expand + int(getattr(self.theme, "padding"))
+        # Pen Width affects padding of boarder because of thickness in drawing. This system should be fixed.
+        self.pen_width = 1
+        self.color = QColor(getattr(self.theme, "system"))
 
         # Make overlay transparent to mouse and background
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
