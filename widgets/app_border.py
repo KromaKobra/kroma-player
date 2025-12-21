@@ -1,4 +1,3 @@
-# app_border.py  (note: "border", not "boarder")
 from PySide6.QtCore import Qt, QEvent, QRectF
 from PySide6.QtGui import QPainter, QPen, QColor, QPainterPath
 from PySide6.QtWidgets import QWidget

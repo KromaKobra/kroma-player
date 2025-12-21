@@ -1,27 +1,6 @@
-# widgets/frameless_dock.py
-import os
-from PySide6.QtWidgets import (
-    QDockWidget,
-    QWidget,
-    QVBoxLayout,
-    QApplication,
-    QMainWindow,
-)
-from PySide6.QtCore import (
-    Qt,
-    QTimer,
-    QEvent,
-    QPoint,
-    QRect,
-)
-from PySide6.QtGui import (
-    QPainter,
-    QColor,
-    QPainterPath,
-    QPen,
-    QBrush,
-    QRegion,
-)
+from PySide6.QtWidgets import QDockWidget, QWidget, QVBoxLayout, QApplication, QMainWindow
+from PySide6.QtCore import Qt, QTimer, QEvent, QPoint, QRect
+from PySide6.QtGui import QPainter, QColor, QPainterPath, QPen, QBrush, QRegion
 from .rounded_card import RoundedCard
 
 
