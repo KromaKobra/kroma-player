@@ -124,22 +124,16 @@ class FramelessDock(QDockWidget):
             | QDockWidget.DockWidgetClosable
         )
 
-        # Visual card and layout
+        # DockWidget background
         self.card = RoundedCard(theme)
+        # Layout will contain content from panes/ (Set with self.set_dock_content(self, widget))
         self.layout = QVBoxLayout(self.card)
-        self.layout.setContentsMargins(2, 2, 2, 2)
-        self.layout.setSpacing(6)
-
-        self.inner = QWidget(self.card)
-        il = QVBoxLayout(self.inner)
-        il.setContentsMargins(0, 0, 0, 0)
-        il.setSpacing(0)
-        self.layout.addWidget(self.inner, 1)
-
+        # Important so that the QDockWidget actually displays the card and content
         self.setWidget(self.card)
+
         self.setAttribute(Qt.WA_TranslucentBackground, False)
         self.topLevelChanged.connect(self._on_top_level_changed)
-        self.setTitleBarWidget(QWidget())
+        self.setTitleBarWidget(QWidget())       # Set titlebar to an empty QWidget to make it disappear
 
         # Drag state
         self._dragging = False
@@ -158,15 +152,10 @@ class FramelessDock(QDockWidget):
         # overlay preview (created lazy when needed)
         self._preview_overlay = None
 
-        self.card.installEventFilter(self)
+        self.card.installEventFilter(self)  # Events targeting the card will be filtered by eventFilter()
 
-    def set_content_widget(self, widget: QWidget):
-        l = self.inner.layout()
-        while l.count():
-            item = l.takeAt(0)
-            if item.widget():
-                item.widget().setParent(None)
-        l.addWidget(widget)
+    def set_dock_content(self, widget: QWidget):
+        self.layout.addWidget(widget)
 
     # ---------- event filter ----------
     def eventFilter(self, obj, event):
@@ -186,24 +175,23 @@ class FramelessDock(QDockWidget):
                     return False
 
                 if not self.isFloating():
-                    dist = (event.globalPos() - self._press_pos_global).manhattanLength()
+                    dist = (event.globalPos() - self._press_pos_global).manhattanLength()   # Dist window been dragged
                     if dist >= QApplication.startDragDistance():
                         self._start_floating_at(event.globalPos(), event.pos())
-                        return True
-                    else:
-                        return True
+                    return True
                 else:
                     # move top-level window
-                    top = self.window()
+                    top = self.window()     # Floating window
                     if top:
+                        # Dist mouse has moved away from the loc on the window
                         new_topleft = event.globalPos() - self._press_pos_local
-                        top.move(new_topleft)
+                        top.move(new_topleft)   # Move the window so the cursor stays in the same spot inside the dock
 
                     # update candidate area, preview + placeholder
-                    new_area = self._area_for_point(event.globalPos())
-                    if new_area != self._dock_candidate_area:
+                    new_area = self._area_for_point(event.globalPos())  # Find new preview area
+                    if new_area != self._dock_candidate_area:           # The area has changed from the frame before
                         self._dock_candidate_area = new_area
-                        if new_area is not None:
+                        if new_area is not None:                        # Show the preview only if the area exists
                             self._show_preview(new_area)
                         else:
                             self._hide_preview()

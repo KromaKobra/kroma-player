@@ -43,12 +43,12 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
 
         controller_dock = FramelessDock("Controls", theme, self)
-        controller_dock.set_content_widget(ControllerPane(theme))
+        controller_dock.set_dock_content(ControllerPane(theme))
         self.addDockWidget(Qt.BottomDockWidgetArea, controller_dock)
         controller_dock.setMaximumHeight(140)
 
         controller_dock2 = FramelessDock("Controls2", theme, self)
-        controller_dock2.set_content_widget(ControllerPane(theme))
+        controller_dock2.set_dock_content(ControllerPane(theme))
         self.addDockWidget(Qt.TopDockWidgetArea, controller_dock2)
         controller_dock2.setMaximumHeight(140)
 
