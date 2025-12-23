@@ -45,12 +45,20 @@ class MainWindow(QMainWindow):
         controller_dock = FramelessDock("Controls", theme, self)
         controller_dock.set_dock_content(ControllerPane(theme))
         self.addDockWidget(Qt.BottomDockWidgetArea, controller_dock)
-        controller_dock.setMaximumHeight(140)
+        # controller_dock.setMaximumHeight(140)
 
-        controller_dock2 = FramelessDock("Controls2", theme, self)
-        controller_dock2.set_dock_content(ControllerPane(theme))
-        self.addDockWidget(Qt.TopDockWidgetArea, controller_dock2)
-        controller_dock2.setMaximumHeight(140)
+        visualizer_dock = FramelessDock("Visual", theme, self)
+        #visualizer_dock.set_dock_content(ControllerPane(theme))
+        self.addDockWidget(Qt.BottomDockWidgetArea, visualizer_dock)
+        self.splitDockWidget(visualizer_dock, controller_dock, Qt.Vertical)
+        # visualizer_dock.setMaximumHeight(200)
+        # visualizer_dock.setMinimumHeight(100)
+
+        playlist_dock = FramelessDock("Playlist", theme, self)
+        self.addDockWidget(Qt.BottomDockWidgetArea, playlist_dock)
+        # self.splitDockWidget(playlist_dock, visualizer_dock, Qt.Vertical)
+        # visualizer_dock.setMaximumHeight(200)
+        # visualizer_dock.setMinimumHeight(100)
 
     def closeEvent(self, event):
         # This is where dock layouts could/should be saved.
