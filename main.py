@@ -1,9 +1,8 @@
 import sys
-from PySide6.QtWidgets import QDockWidget, QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QFrame
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout
 from app.theme import Theme
 from app.style import apply_global_style
 from panes.controller_pane import ControllerPane
-from widgets.frameless_dock import FramelessDock
 from widgets.app_border import BorderOverlay
 from widgets.rounded_card import RoundedCard
 
