@@ -15,6 +15,7 @@ class Theme:
     app_margins: int = 14
     app_padding: int = 6
     padding: int = 3
+    menubar_height: int = 35
 
     def as_dict(self):
         return self.__dict__

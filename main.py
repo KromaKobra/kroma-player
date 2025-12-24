@@ -3,6 +3,7 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, Q
 from app.theme import Theme
 from app.style import apply_global_style
 from panes.controller_pane import ControllerPane
+from panes.playlist_pane import PlaylistPane
 from widgets.app_border import BorderOverlay
 from widgets.rounded_card import RoundedCard
 
@@ -12,12 +13,10 @@ class AppWindow(QWidget):
     # This is useful so we can add a margin between the edge of the screen and the dock widgets.
     def __init__(self, theme: Theme):
         super().__init__()
-        self.resize(1200, 760)
-        self.setWindowTitle("Kroma Player")
 
         margin_layout = QHBoxLayout(self)
         margins = getattr(theme, "app_margins")
-        margin_layout.setContentsMargins(margins, margins, margins, margins)
+        margin_layout.setContentsMargins(margins, margins + getattr(theme, "menubar_height"), margins, margins)
 
         self.main_window = MainWindow(theme)
         margin_layout.addWidget(self.main_window)
@@ -41,34 +40,35 @@ class MainWindow(QMainWindow):
         controller = RoundedCard(theme)
         controller.setMaximumHeight(75)
         controller.set_content_widget(ControllerPane(theme))
-        library = RoundedCard(theme)
-        library.setMaximumWidth(225)
-        visualizer = RoundedCard(theme)
-        visualizer.setMaximumHeight(150)
+        # library = RoundedCard(theme)
+        # library.setMaximumWidth(225)
+        # visualizer = RoundedCard(theme)
+        # visualizer.setMaximumHeight(150)
         playlist = RoundedCard(theme)
-        info = RoundedCard(theme)
-        info.setMaximumWidth(225)
+        playlist.set_content_widget(PlaylistPane(theme))
+        # info = RoundedCard(theme)
+        # info.setMaximumWidth(225)
 
-        widget2 = QWidget()
-        layout1.addWidget(widget2)
+        # widget2 = QWidget()
+        layout1.addWidget(playlist)
         layout1.addWidget(controller)
-        layout2 = QHBoxLayout(widget2)
+        layout2 = QHBoxLayout(playlist)
         layout2.setContentsMargins(0, 0, 0, 0)
 
-        widget3 = QWidget()
-        layout2.addWidget(library)
-        layout2.addWidget(widget3)
-        layout3 = QVBoxLayout(widget3)
-        layout3.setContentsMargins(0, 0, 0, 0)
-
-        widget4 = QWidget()
-        layout3.addWidget(widget4)
-        layout3.addWidget(visualizer)
-        layout4 = QHBoxLayout(widget4)
-        layout4.setContentsMargins(0, 0, 0, 0)
-
-        layout4.addWidget(playlist)
-        layout4.addWidget(info)
+        # widget3 = QWidget()
+        # layout2.addWidget(library)
+        # layout2.addWidget(widget3)
+        # layout3 = QVBoxLayout(widget3)
+        # layout3.setContentsMargins(0, 0, 0, 0)
+        #
+        # widget4 = QWidget()
+        # layout3.addWidget(widget4)
+        # layout3.addWidget(visualizer)
+        # layout4 = QHBoxLayout(widget4)
+        # layout4.setContentsMargins(0, 0, 0, 0)
+        #
+        # layout4.addWidget(playlist)
+        # layout4.addWidget(info)
 
         self.setCentralWidget(central)
 
@@ -90,6 +90,8 @@ if __name__ == "__main__":
     apply_global_style(app, theme)
 
     app_window = AppWindow(theme)
+    app_window.resize(1200, 760)
+    app_window.setWindowTitle("Kroma Player")
 
     app_window.show()
     sys.exit(app.exec())
