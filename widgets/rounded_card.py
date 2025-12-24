@@ -17,6 +17,7 @@ class RoundedCard(QFrame):
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
 
         #shadow = QGraphicsDropShadowEffect(self)
         #shadow.setBlurRadius(getattr(theme, "shadow_blur", 20))
