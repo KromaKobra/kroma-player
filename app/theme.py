@@ -12,9 +12,9 @@ class Theme:
     shadow_blur: int = 20
     icon_size: int = 20
 
-    app_margins: int = 8
-    app_padding: int = 4
-    padding: int = 5
+    app_margins: int = 14
+    app_padding: int = 6
+    padding: int = 3
 
     def as_dict(self):
         return self.__dict__

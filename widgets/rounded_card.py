@@ -1,9 +1,9 @@
 # widgets/rounded_card.py
-from PySide6.QtWidgets import QWidget, QGraphicsDropShadowEffect, QSizePolicy
+from PySide6.QtWidgets import QWidget, QGraphicsDropShadowEffect, QSizePolicy, QFrame, QVBoxLayout
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QRegion
 from PySide6.QtCore import Qt, QRectF
 
-class RoundedCard(QWidget):
+class RoundedCard(QFrame):
     """
     A rounded card with background color, clipping mask and optional shadow.
     Use this as the container for dock contents.
@@ -16,12 +16,16 @@ class RoundedCard(QWidget):
         self.bg = QColor(getattr(theme, "system"))
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.layout = QVBoxLayout(self)
 
         #shadow = QGraphicsDropShadowEffect(self)
         #shadow.setBlurRadius(getattr(theme, "shadow_blur", 20))
         #shadow.setOffset(0, 8)
         #shadow.setColor(QColor(0, 0, 0, 140))
         #self.setGraphicsEffect(shadow)
+
+    def set_content_widget(self, widget: QWidget):
+        self.layout.addWidget(widget)
 
     # ---------- geometry helpers ----------
     def _inner_rect(self) -> QRectF:

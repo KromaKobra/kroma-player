@@ -1,10 +1,11 @@
 import sys
-from PySide6.QtWidgets import QDockWidget, QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout
+from PySide6.QtWidgets import QDockWidget, QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QFrame
 from app.theme import Theme
 from app.style import apply_global_style
 from panes.controller_pane import ControllerPane
 from widgets.frameless_dock import FramelessDock
 from widgets.app_border import BorderOverlay
+from widgets.rounded_card import RoundedCard
 
 
 class AppWindow(QWidget):
@@ -34,31 +35,44 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.theme = theme
 
-        # This whole section can probably be removed once all of the docks have been added.
-        # It's currently just used to allow the docks to not have to fill the entire MainWindow.
         central = QWidget()
-        central.setObjectName("central_widget")
-        layout = QHBoxLayout(central)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout1 = QVBoxLayout(central)
+        layout1.setContentsMargins(0, 0, 0, 0)
+
+        controller = RoundedCard(theme)
+        controller.setMaximumHeight(75)
+        controller.set_content_widget(ControllerPane(theme))
+        library = RoundedCard(theme)
+        library.setMaximumWidth(225)
+        visualizer = RoundedCard(theme)
+        visualizer.setMaximumHeight(150)
+        playlist = RoundedCard(theme)
+        info = RoundedCard(theme)
+        info.setMaximumWidth(225)
+
+        widget2 = QWidget()
+        layout1.addWidget(widget2)
+        layout1.addWidget(controller)
+        layout2 = QHBoxLayout(widget2)
+        layout2.setContentsMargins(0, 0, 0, 0)
+
+        widget3 = QWidget()
+        layout2.addWidget(library)
+        layout2.addWidget(widget3)
+        layout3 = QVBoxLayout(widget3)
+        layout3.setContentsMargins(0, 0, 0, 0)
+
+        widget4 = QWidget()
+        layout3.addWidget(widget4)
+        layout3.addWidget(visualizer)
+        layout4 = QHBoxLayout(widget4)
+        layout4.setContentsMargins(0, 0, 0, 0)
+
+        layout4.addWidget(playlist)
+        layout4.addWidget(info)
+
         self.setCentralWidget(central)
 
-        controller_dock = FramelessDock("Controls", theme, self)
-        controller_dock.set_dock_content(ControllerPane(theme))
-        self.addDockWidget(Qt.BottomDockWidgetArea, controller_dock)
-        # controller_dock.setMaximumHeight(140)
-
-        visualizer_dock = FramelessDock("Visual", theme, self)
-        #visualizer_dock.set_dock_content(ControllerPane(theme))
-        self.addDockWidget(Qt.BottomDockWidgetArea, visualizer_dock)
-        self.splitDockWidget(visualizer_dock, controller_dock, Qt.Vertical)
-        # visualizer_dock.setMaximumHeight(200)
-        # visualizer_dock.setMinimumHeight(100)
-
-        playlist_dock = FramelessDock("Playlist", theme, self)
-        self.addDockWidget(Qt.BottomDockWidgetArea, playlist_dock)
-        # self.splitDockWidget(playlist_dock, visualizer_dock, Qt.Vertical)
-        # visualizer_dock.setMaximumHeight(200)
-        # visualizer_dock.setMinimumHeight(100)
 
     def closeEvent(self, event):
         # This is where dock layouts could/should be saved.
