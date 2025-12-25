@@ -13,6 +13,10 @@ class Theme:
     shadow_blur: int = 20
     icon_size: int = 20
 
+    # Dock Settings
+    playlist_margins: int = 20
+
+    # App Settings
     app_margins: int = 14
     app_padding: int = 6
     padding: int = 3

@@ -9,7 +9,7 @@ class BorderOverlay(QWidget):
         self.theme = theme
         self.outer_expand = int(getattr(self.theme, "app_padding"))
         self.inset_from_margin = 0
-        self.radius = int(getattr(theme, "dock_radius")) + self.outer_expand + int(getattr(self.theme, "padding"))
+        self.radius = int(getattr(self.theme, "dock_radius")) + self.outer_expand + int(getattr(self.theme, "padding"))
         # Pen Width affects padding of boarder because of thickness in drawing. This system should be fixed.
         self.pen_width = 1
         self.color = QColor(getattr(self.theme, "system"))

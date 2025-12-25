@@ -45,6 +45,8 @@ class MainWindow(QMainWindow):
         # visualizer = RoundedCard(theme)
         # visualizer.setMaximumHeight(150)
         playlist = RoundedCard(theme)
+        m = getattr(self.theme, "playlist_margins")
+        playlist.setContentsMargins(m, 0, m, 0)
         playlist.set_content_widget(PlaylistPane(theme))
         # info = RoundedCard(theme)
         # info.setMaximumWidth(225)

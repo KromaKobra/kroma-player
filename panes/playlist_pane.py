@@ -19,7 +19,7 @@ class PlaylistPane(QWidget):
         # self.playlist.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)  # Title expands
         # self.playlist.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
         # self.playlist.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        self.playlist.setRowCount(4)
+        self.playlist.setRowCount(20)
         self.playlist.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
         self.playlist.horizontalHeader().setVisible(False)  # column names
         self.playlist.verticalHeader().setVisible(False)  # row numbers
@@ -29,6 +29,22 @@ class PlaylistPane(QWidget):
             ("2", "Paranoid Android", "Radiohead", "OK Computer", "6:27"),
             ("3", "Time Is Running Out", "Muse", "Absolution", "3:58"),
             ("4", "Numb", "Linkin Park", "Meteora", "3:07"),
+            ("5", "Knights of Cydonia", "Muse", "Black Holes and Revelations", "6:07"),
+            ("6", "In the End", "Linkin Park", "Hybrid Theory", "3:36"),
+            ("7", "Idioteque", "Radiohead", "Kid A", "5:09"),
+            ("8", "Plug In Baby", "Muse", "Origin of Symmetry", "3:39"),
+            ("9", "Crawling", "Linkin Park", "Hybrid Theory", "3:29"),
+            ("10", "Karma Police", "Radiohead", "OK Computer", "4:21"),
+            ("11", "Stockholm Syndrome", "Muse", "Absolution", "4:58"),
+            ("12", "Breaking the Habit", "Linkin Park", "Meteora", "3:16"),
+            ("13", "How to Disappear Completely", "Radiohead", "Kid A", "5:56"),
+            ("14", "Supermassive Black Hole", "Muse", "Black Holes and Revelations", "3:36"),
+            ("15", "Faint", "Linkin Park", "Meteora", "2:42"),
+            ("16", "No Surprises", "Radiohead", "OK Computer", "3:49"),
+            ("17", "Map of the Problematique", "Muse", "Black Holes and Revelations", "4:18"),
+            ("18", "Papercut", "Linkin Park", "Hybrid Theory", "3:04"),
+            ("19", "Weird Fishes/Arpeggi", "Radiohead", "In Rainbows", "5:18"),
+            ("20", "Hysteria", "Muse", "Absolution", "3:47"),
         ]
         for r, row in enumerate(demo):
             for c, val in enumerate(row):
@@ -59,68 +75,16 @@ class PlaylistPane(QWidget):
         """Recompute column widths when the widget (and layout) resize."""
         super().resizeEvent(event)
         self._adjust_column_widths()
-        self._update_ext_scroll_visibility_and_geometry()
 
     def _adjust_column_widths(self):
-        """Set column widths so they sum to the table widget's width,
-        using the percentages in self._col_percents."""
+        """Use self._col_percents to set column widths."""
         col_count = self.playlist.columnCount()
-        if col_count <= 0:
-            return
-
-        # If percent list length doesn't match, fall back to even distribution
-        if len(self._col_percents) != col_count:
-            per = 1.0 / col_count
-            self._col_percents = [per] * col_count
-
-        # Use the table widget's width (table is centered and slightly narrower than the whole pane)
-        table_w = self.playlist.width()
-        if table_w <= 0:
-            return
-
-        # compute integer widths and distribute rounding remainder
-        widths = [int(self._col_percents[i] * table_w) for i in range(col_count)]
-        used = sum(widths)
-        remainder = table_w - used
-        i = 0
-        while remainder > 0:
-            widths[i % col_count] += 1
-            remainder -= 1
-            i += 1
-
-        for col in range(col_count):
+        # ISSUE MAY BE FOUND HERE !!!
+        table_w = self.width()                                  # Width of widget
+        widths = [int(self._col_percents[i] * table_w) for i in range(col_count)]   # Percentages to PXs
+        widths[col_count - 1] += int(table_w - sum(widths))     # Add rounded px remainder to last column
+        for col in range(col_count):                            # Sequentially size each column
             self.playlist.setColumnWidth(col, widths[col])
-
-    def _update_ext_scroll_visibility_and_geometry(self):
-        # resizeEvent can fire before __init__ completes
-        if not hasattr(self, "ext_vscroll"):
-            return
-
-        internal_vscroll = self.playlist.verticalScrollBar()
-
-        needs_scroll = internal_vscroll.maximum() > 0
-        self.ext_vscroll.setVisible(needs_scroll)
-
-        # Ensure external scrollbar height matches table's height and is aligned with it
-        # Map the table geometry to the PlaylistPane coordinates
-        table_geom = self.playlist.geometry()
-        # Place scrollbar to the right of the table, matching its top and height
-        scrollbar_width = self.ext_vscroll.sizeHint().width()
-        x = table_geom.right() + 0  # directly to the right of the table
-        y = table_geom.top()
-        height = table_geom.height()
-
-        # If placing scrollbar directly would run off the widget, clamp it inside contentsRect
-        contents = self.contentsRect()
-        max_x = contents.right() - scrollbar_width
-        if x > max_x:
-            x = max_x
-        if y < contents.top():
-            y = contents.top()
-        if y + height > contents.bottom():
-            height = max(10, contents.bottom() - y)
-
-        self.ext_vscroll.setGeometry(x, y, scrollbar_width, height)
 
 
 class IndexCol(QLabel):
