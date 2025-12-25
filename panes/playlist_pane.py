@@ -10,16 +10,19 @@ class PlaylistPane(QWidget):
         self.setObjectName("")  # can be used for qss
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        self._col_percents = [0.05, 0.45, 0.25, 0.20, 0.05]
+        self._table_margin = 30  # pixels smaller than layout width
 
-        playlist = QTableWidget()
-        playlist.setColumnCount(5)
-        # playlist.setHorizontalHeaderLabels(["#", "Title", "Artist", "Album", "Dur"])
-        # playlist.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)  # Title expands
-        # playlist.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        # playlist.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        playlist.setRowCount(4)
-        playlist.horizontalHeader().setVisible(False)  # column names
-        playlist.verticalHeader().setVisible(False)  # row numbers
+        self.playlist = QTableWidget()
+        self.playlist.setColumnCount(5)
+        # self.playlist.setHorizontalHeaderLabels(["#", "Title", "Artist", "Album", "Dur"])
+        # self.playlist.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)  # Title expands
+        # self.playlist.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        # self.playlist.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.playlist.setRowCount(4)
+        self.playlist.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
+        self.playlist.horizontalHeader().setVisible(False)  # column names
+        self.playlist.verticalHeader().setVisible(False)  # row numbers
 
         demo = [
             ("1", "Everything In Its Right Place", "Radiohead", "Kid A", "4:11"),
@@ -30,13 +33,13 @@ class PlaylistPane(QWidget):
         for r, row in enumerate(demo):
             for c, val in enumerate(row):
                 item = IndexCol(theme, val)
-                playlist.setCellWidget(r, c, item)
+                self.playlist.setCellWidget(r, c, item)
 
-        playlist.setSelectionBehavior(QTableWidget.SelectRows)
-        playlist.setShowGrid(False)
-        playlist.setFocusPolicy(Qt.NoFocus)
-        playlist.verticalHeader().setDefaultSectionSize(56)
-        playlist.setStyleSheet("""
+        self.playlist.setSelectionBehavior(QTableWidget.SelectRows)
+        # self.playlist.setShowGrid(False)
+        self.playlist.setFocusPolicy(Qt.NoFocus)
+        self.playlist.verticalHeader().setDefaultSectionSize(56)
+        self.playlist.setStyleSheet("""
         QTableView {
             background: transparent;
             border: none;
@@ -49,7 +52,76 @@ class PlaylistPane(QWidget):
             background: rgba(80, 160, 255, 40);
         }
         """)
-        layout.addWidget(playlist)
+        layout.addWidget(self.playlist)
+        self._adjust_column_widths()
+
+    def resizeEvent(self, event):
+        """Recompute column widths when the widget (and layout) resize."""
+        super().resizeEvent(event)
+        self._adjust_column_widths()
+        self._update_ext_scroll_visibility_and_geometry()
+
+    def _adjust_column_widths(self):
+        """Set column widths so they sum to the table widget's width,
+        using the percentages in self._col_percents."""
+        col_count = self.playlist.columnCount()
+        if col_count <= 0:
+            return
+
+        # If percent list length doesn't match, fall back to even distribution
+        if len(self._col_percents) != col_count:
+            per = 1.0 / col_count
+            self._col_percents = [per] * col_count
+
+        # Use the table widget's width (table is centered and slightly narrower than the whole pane)
+        table_w = self.playlist.width()
+        if table_w <= 0:
+            return
+
+        # compute integer widths and distribute rounding remainder
+        widths = [int(self._col_percents[i] * table_w) for i in range(col_count)]
+        used = sum(widths)
+        remainder = table_w - used
+        i = 0
+        while remainder > 0:
+            widths[i % col_count] += 1
+            remainder -= 1
+            i += 1
+
+        for col in range(col_count):
+            self.playlist.setColumnWidth(col, widths[col])
+
+    def _update_ext_scroll_visibility_and_geometry(self):
+        # resizeEvent can fire before __init__ completes
+        if not hasattr(self, "ext_vscroll"):
+            return
+
+        internal_vscroll = self.playlist.verticalScrollBar()
+
+        needs_scroll = internal_vscroll.maximum() > 0
+        self.ext_vscroll.setVisible(needs_scroll)
+
+        # Ensure external scrollbar height matches table's height and is aligned with it
+        # Map the table geometry to the PlaylistPane coordinates
+        table_geom = self.playlist.geometry()
+        # Place scrollbar to the right of the table, matching its top and height
+        scrollbar_width = self.ext_vscroll.sizeHint().width()
+        x = table_geom.right() + 0  # directly to the right of the table
+        y = table_geom.top()
+        height = table_geom.height()
+
+        # If placing scrollbar directly would run off the widget, clamp it inside contentsRect
+        contents = self.contentsRect()
+        max_x = contents.right() - scrollbar_width
+        if x > max_x:
+            x = max_x
+        if y < contents.top():
+            y = contents.top()
+        if y + height > contents.bottom():
+            height = max(10, contents.bottom() - y)
+
+        self.ext_vscroll.setGeometry(x, y, scrollbar_width, height)
+
 
 class IndexCol(QLabel):
     def __init__(self, theme, idx, parent=None):
@@ -58,80 +130,11 @@ class IndexCol(QLabel):
         self.setText(idx)
 
         self.font = QFont()
-        self.font.setFamily("Segoe UI")  # or any installed font
+        self.font.setFamily("AmsiPro")  # or any installed font
         self.font.setPointSize(11)  # text size
-        self.font.setWeight(QFont.Medium)  # or QFont.Bold
+        self.font.setWeight(QFont.Black)  # or QFont.Bold
+        self.color = getattr(self.theme, "secondary")
+        self.setStyleSheet("QLabel { color : " + self.color + "; }")
 
         self.setFont(self.font)
-
-        # playlist = QListWidget()
-        # playlist.setStyleSheet("""
-        #         QListWidget {
-        #             background: transparent;
-        #             border: none;
-        #         }
-        #         QListWidget::item {
-        #             background: transparent;
-        #         }
-        #         /* disable default selection highlight if selection mode is not NoSelection */
-        #         QListWidget::item:selected {
-        #             background: transparent;
-        #         }
-        #         QListWidget::item:focus {
-        #             background: transparent;
-        #         }
-        #     """)
-        # for i in range(1, 21):
-        #     item = QListWidgetItem(playlist)
-        #     widget = TrackEntry("theme will go here", f"Track {i:02d}", "Sample Artist")
-        #
-        #     item.setSizeHint(widget.sizeHint())
-        #     playlist.addItem(item)
-        #     playlist.setItemWidget(item, widget)
-        # layout.addWidget(playlist)
-
-
-# class TrackEntry(QWidget):
-#     def __init__(self, theme, title: str, subtitle: str = "", parent=None):
-#         super().__init__(parent)
-#
-#         # Labels
-#         self.title_label = QLabel(title)
-#         self.subtitle_label = QLabel(subtitle)
-#
-#         self.title_label.setObjectName("title")
-#         self.subtitle_label.setObjectName("subtitle")
-#
-#         # Layout
-#         text_layout = QVBoxLayout()
-#         # text_layout.setSpacing(2)
-#         text_layout.setContentsMargins(0, 0, 0, 0)
-#         text_layout.addWidget(self.title_label)
-#         text_layout.addWidget(self.subtitle_label)
-#
-#         main_layout = QHBoxLayout(self)
-#         main_layout.setContentsMargins(12, 8, 12, 8)
-#         main_layout.addLayout(text_layout)
-#
-#         # Background + styling
-#         self.setObjectName("listEntry")
-#         self.setStyleSheet("""
-#                     QWidget#listEntry {
-#                         background-color: #2b2b2b;
-#                         border-radius: 6px;
-#                     }
-#
-#                     QLabel#title {
-#                         color: white;
-#                         font-weight: 600;
-#                         font-size: 14px;
-#                     }
-#
-#                     QLabel#subtitle {
-#                         color: #aaaaaa;
-#                         font-size: 11px;
-#                     }
-#                 """)
-#
-#         # Fixed height is important for list widgets
-#         self.setMinimumHeight(56)
+        self.setIndent(20)

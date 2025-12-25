@@ -5,6 +5,7 @@ from dataclasses import dataclass
 class Theme:
     # Colors (all hex strings)
     system: str = "#171215"
+    secondary: str = "#9d6794"
     tmp: str = "#000000"
 
     # Radii / sizes
