@@ -1,0 +1,5 @@
+Requirements for Kroma Player:
+
+- (Windows 11) Is currently being designed for Windows, but it will be ported to Linux in the future.
+- (Python 3.14) Is built with Python
+- (PySide6 6.10.1) Uses the Qt Framework with PySide6.
