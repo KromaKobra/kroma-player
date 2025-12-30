@@ -1,3 +1,9 @@
+### HELP NEEDED!
+This indie project is large and ambitious for a single freshman college student
+so if the project intrigues you and you would like to support it by participating
+in its creation, please email me at "kromakobra@gmail.com" to work out the
+details.
+
 # Kroma Player
 Kroma Player is a highly customizable and capable music player for online and
 downloaded music. It utilizes the Spotify API for finding songs online, and
@@ -33,3 +39,7 @@ in panes/controller_pane.py.
 class. It is a boarder for the entire app and is defined in widgets/app_boarder.py.
 
 In *widgets/frameless_dock.py*:
+<br>NOTE: frameless docks have been temporarily removed as the functionality
+is very advanced. The dock panes functionality have been moved to the project
+"venom_view" which can be found on my profile. Once venom_view is finished,
+it will be ported into this project.
