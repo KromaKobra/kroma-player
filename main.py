@@ -1,99 +1,66 @@
 import sys
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout
-from app.theme import Theme
-from app.style import apply_global_style
-from panes.controller_pane import ControllerPane
-from panes.playlist_pane import PlaylistPane
-from widgets.app_border import BorderOverlay
-from widgets.rounded_card import RoundedCard
+from PySide6.QtGui import QGuiApplication
+from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtCore import QObject, Property, Slot, Signal
 
+# Minimal Theme QObject exposing a few properties for QML
+class Theme(QObject):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._app_margins = 20
+        self._menubar_height = 34
+        self._playlist_margins = 12
+        self._card_radius = 12
+        self._primary_color = "#121212"
+        self._card_color = "#1f1f1f"
+        self._accent_color = "#ff6b6b"
+        self._text_color = "#e6e6e6"
 
-class AppWindow(QWidget):
-    # The AppWindow QWidget currently exists to contain the QMainWindow that contains the dock widgets.
-    # This is useful so we can add a margin between the edge of the screen and the dock widgets.
-    def __init__(self, theme: Theme):
-        super().__init__()
+    def getAppMargins(self):
+        return self._app_margins
 
-        margin_layout = QHBoxLayout(self)
-        margins = getattr(theme, "app_margins")
-        margin_layout.setContentsMargins(margins, margins + getattr(theme, "menubar_height"), margins, margins)
+    def getMenubarHeight(self):
+        return self._menubar_height
 
-        self.main_window = MainWindow(theme)
-        margin_layout.addWidget(self.main_window)
+    def getPlaylistMargins(self):
+        return self._playlist_margins
 
-        self.border_overlay = BorderOverlay(
-            parent=self,
-            target=self.main_window,
-            theme=theme
-        )
+    def getCardRadius(self):
+        return self._card_radius
 
+    def getPrimaryColor(self):
+        return self._primary_color
 
-class MainWindow(QMainWindow):
-    def __init__(self, theme: Theme):
-        super().__init__()
-        self.theme = theme
+    def getCardColor(self):
+        return self._card_color
 
-        central = QWidget()
-        layout1 = QVBoxLayout(central)
-        layout1.setContentsMargins(0, 0, 0, 0)
+    def getAccentColor(self):
+        return self._accent_color
 
-        controller = RoundedCard(theme)
-        controller.setMaximumHeight(75)
-        controller.set_content_widget(ControllerPane(theme))
-        # library = RoundedCard(theme)
-        # library.setMaximumWidth(225)
-        # visualizer = RoundedCard(theme)
-        # visualizer.setMaximumHeight(150)
-        playlist = RoundedCard(theme)
-        m = getattr(self.theme, "playlist_margins")
-        playlist.setContentsMargins(m, 0, m, 0)
-        playlist.set_content_widget(PlaylistPane(theme))
-        # info = RoundedCard(theme)
-        # info.setMaximumWidth(225)
+    def getTextColor(self):
+        return self._text_color
 
-        # widget2 = QWidget()
-        layout1.addWidget(playlist)
-        layout1.addWidget(controller)
-        layout2 = QHBoxLayout(playlist)
-        layout2.setContentsMargins(0, 0, 0, 0)
-
-        # widget3 = QWidget()
-        # layout2.addWidget(library)
-        # layout2.addWidget(widget3)
-        # layout3 = QVBoxLayout(widget3)
-        # layout3.setContentsMargins(0, 0, 0, 0)
-        #
-        # widget4 = QWidget()
-        # layout3.addWidget(widget4)
-        # layout3.addWidget(visualizer)
-        # layout4 = QHBoxLayout(widget4)
-        # layout4.setContentsMargins(0, 0, 0, 0)
-        #
-        # layout4.addWidget(playlist)
-        # layout4.addWidget(info)
-
-        self.setCentralWidget(central)
-
-
-    def closeEvent(self, event):
-        # This is where dock layouts could/should be saved.
-        super().closeEvent(event)
+    appMargins = Property(int, getAppMargins)
+    menubarHeight = Property(int, getMenubarHeight)
+    playlistMargins = Property(int, getPlaylistMargins)
+    cardRadius = Property(int, getCardRadius)
+    primaryColor = Property(str, getPrimaryColor)
+    cardColor = Property(str, getCardColor)
+    accentColor = Property(str, getAccentColor)
+    textColor = Property(str, getTextColor)
 
 
 if __name__ == "__main__":
-    from PySide6.QtCore import Qt
-    app = QApplication(sys.argv)
+    app = QGuiApplication(sys.argv)
 
-    # create theme and make available
+    engine = QQmlApplicationEngine()
+
     theme = Theme()
-    app.setProperty("theme", theme)
+    # Expose the Theme instance to QML as "theme"
+    engine.rootContext().setContextProperty("theme", theme)
 
-    # apply global stylesheet
-    apply_global_style(app, theme)
-
-    app_window = AppWindow(theme)
-    app_window.resize(1200, 760)
-    app_window.setWindowTitle("Kroma Player")
-
-    app_window.show()
+    qml_file = "qml/Main.qml"
+    engine.load(qml_file)
+    if not engine.rootObjects():
+        sys.exit(-1)
     sys.exit(app.exec())
