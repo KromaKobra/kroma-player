@@ -31,21 +31,23 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 9
 
-        Rectangle {
+        // A copy of assets/icon.png: the bundle holds only this GUI's own tree.
+        // sourceSize decodes the 512 px original at display size, doubled for
+        // high-DPI screens, rather than keeping all of it in memory.
+        Image {
             anchors.verticalCenter: parent.verticalCenter
-            width: 9
-            height: 9
-            radius: 4.5
-            gradient: Gradient {
-                orientation: Gradient.Horizontal
-                GradientStop { position: 0.0; color: Theme.accent }
-                GradientStop { position: 1.0; color: Theme.accentAlt }
-            }
+            width: 18
+            height: 18
+            source: "../assets/icon.png"
+            sourceSize: Qt.size(36, 36)
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+            mipmap: true
         }
 
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            text: "Nocturne"
+            text: "Kroma Player"
             color: Theme.text
             font.family: Theme.displayFamily
             font.pixelSize: Theme.fzBody
