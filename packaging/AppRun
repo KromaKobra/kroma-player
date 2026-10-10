@@ -1,0 +1,18 @@
+#!/bin/sh
+# The AppImage entry point: what runs when the user executes the .AppImage.
+#
+# $APPDIR is set by the AppImage runtime to the mount point of the extracted
+# image, and $APPIMAGE to the path of the .AppImage file itself. The second one
+# is load-bearing beyond starting the app: app/update/install_kind.py reads it
+# to recognise this install kind, and app/update/apply.py os.replace()s the
+# downloaded build over it. The runtime exports both, and this script must not
+# unset or shadow either.
+
+set -eu
+
+APPDIR=${APPDIR:-$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)}
+
+# exec rather than a plain call: the AppImage runtime waits on this process, and
+# an extra shell between it and the application would swallow signals — a
+# Ctrl-C or a session logout would reach the wrapper and not the player.
+exec "$APPDIR/usr/bin/kroma-player" "$@"

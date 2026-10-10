@@ -1,0 +1,17 @@
+[Desktop Entry]
+Type=Application
+Name=Kroma Player
+GenericName=Music Player
+Comment=Local music player and library manager
+Exec=kroma-player %U
+Icon=kroma-player
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+Keywords=music;audio;player;library;playlist;
+# Must match the Wayland app_id / X11 WM_CLASS, which app/main.py sets via
+# QGuiApplication.setDesktopFileName("kroma-player"). If either side is renamed
+# the shell stops associating the window with this entry and falls back to a
+# generic icon.
+StartupWMClass=kroma-player
+StartupNotify=true
+MimeType=audio/ogg;audio/opus;audio/flac;audio/mpeg;audio/mp4;audio/x-wav;

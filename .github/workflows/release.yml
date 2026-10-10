@@ -1,0 +1,410 @@
+name: release
+
+# A `v<version>` tag is the only thing that publishes a release. Not a push to
+# `main`, not a manual dispatch, not a merge — a tag, and only one that passes
+# the guard below. That is what makes "releases live on `main`" a mechanism
+# rather than a habit somebody has to remember at the end of a long day.
+#
+# A manual dispatch is a **dry run**: everything up to publishing — the guard's
+# tests, both builds, the Windows install/update/uninstall test — against
+# APP_VERSION on whatever branch it was started from, with the installer and
+# the logs uploaded as workflow artifacts. Nothing is tagged or published.
+# Steps that only make sense for a tag say so with `github.ref_type == 'tag'`.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+# The tag is what the release is named for, so two runs of the same tag would
+# race each other to create it. One at a time, and never cancelled halfway —
+# a cancelled publish leaves a half-uploaded release on the page.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  # ---------------------------------------------------------------------
+  # Refuse a tag that should not have been pushed, before anything is built
+  # ---------------------------------------------------------------------
+  guard:
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      # Full history: `git branch --contains` needs the commits between this
+      # tag and the tip of main, and the default shallow clone has none of them.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: The tag must be on main
+        if: github.ref_type == 'tag'
+        run: |
+          git fetch origin main --quiet
+          # Trimmed and matched whole, because `git branch -r` indents every
+          # line and also prints `origin/HEAD -> origin/main`, which contains
+          # the string and means nothing.
+          if ! git branch -r --contains "$GITHUB_SHA" \
+               | sed 's/^[[:space:]]*//' | grep -qx 'origin/main'; then
+            echo "::error::$GITHUB_REF_NAME is on a commit that is not reachable from main."
+            echo "Releases are cut from main. Merge to main first, then tag the merge."
+            exit 1
+          fi
+
+      # app/versions.py imports nothing, so this runs before any dependency is
+      # installed. A tag must match it; a dry run simply builds it.
+      - name: The version, which a tag must match
+        id: version
+        run: |
+          DECLARED=$(python -c 'from app.versions import APP_VERSION; print(APP_VERSION)')
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+            if [ "$VERSION" != "$DECLARED" ]; then
+              echo "::error::tag $GITHUB_REF_NAME does not match APP_VERSION ($DECLARED)."
+              echo "APP_VERSION names the most recent release; bump it in the commit you tag."
+              exit 1
+            fi
+          else
+            VERSION="$DECLARED"
+            echo "::notice::Dry run of $VERSION from $GITHUB_REF_NAME. Nothing will be published."
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # An error for a tag, which would publish without one. A warning for a
+      # dry run, which is the moment to find out.
+      - name: The release must have a changelog
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [ ! -f "docs/changelog/v${VERSION}.md" ]; then
+            LEVEL=error
+            [ "$GITHUB_REF_TYPE" = "tag" ] || LEVEL=warning
+            echo "::$LEVEL::docs/changelog/v${VERSION}.md does not exist."
+            echo "It is the body of the release, and the only place a vault migration is announced."
+            [ "$LEVEL" = "warning" ] || exit 1
+          fi
+
+      # A tag skips the PR that would have run the tests, so the guard runs them
+      # itself rather than trusting that whatever landed on main was green.
+      - name: Install Qt's system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 \
+            libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
+            libxcb-shape0 libxcb-xinerama0 libdbus-1-3 libpulse0
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+
+      # The fast suite whole, then only the GUI tests that cover what a release
+      # ships: the interface packages, the settings tabs, and the update
+      # dialog. The rest of the GUI suite includes geometry tests that fail
+      # under the offscreen platform on a clean checkout, and a release is not
+      # held hostage to them. No check-docs: docs/ is being rewritten outside
+      # the repository and is knowingly stale.
+      - name: pytest (everything but the GUI)
+        run: python -m pytest -q -m "not gui"
+
+      - name: pytest (the GUI a release depends on)
+        run: |
+          python -m pytest -q \
+            tests/test_gui_packages.py tests/test_settings_tabs.py tests/test_update_dialog.py
+
+      # Every copy of the app asks REPO for updates for the rest of its life. A
+      # release published from any other repository would be one nobody's
+      # updater ever sees, and a later one published from the right repository
+      # would never reach the copies that came from here.
+      - name: The updater must point at this repository
+        run: |
+          REPO=$(python -c 'from app.update.release import REPO; print(REPO)')
+          if [ "${REPO,,}" != "${GITHUB_REPOSITORY,,}" ]; then
+            echo "::error::app/update/release.py has REPO = $REPO, but this is $GITHUB_REPOSITORY."
+            echo "Set REPO to the repository releases are published from."
+            exit 1
+          fi
+
+      # The manifest step runs last, after both builds, and is the one thing the
+      # updater cannot do without. Run it now on stand-ins named the way the
+      # builds name their output, so a mistake surfaces here rather than after
+      # an hour of building.
+      - name: release-manifest, on stand-in artifacts
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          STAND_IN=$(mktemp -d)
+          for name in \
+            "KromaPlayerSetup-$VERSION-x86_64.exe" \
+            "kroma-player-$VERSION-windows-x86_64.zip" \
+            "kroma-player-$VERSION-x86_64.AppImage" \
+            "kroma-player-$VERSION-linux-x86_64.tar.gz"; do
+            printf 'stand-in for %s\n' "$name" > "$STAND_IN/$name"
+          done
+          python scripts/release-manifest "$STAND_IN"
+          python - "$STAND_IN/release.json" <<'PY'
+          import json, sys
+          manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+          kinds = {asset["kind"] for asset in manifest["assets"]}
+          missing = {"windows_installer", "appimage"} - kinds
+          assert not missing, f"release.json does not classify: {sorted(missing)}"
+          assert manifest["schema_version"] > 0, "release.json has no schema_version"
+          print("release.json:", sorted(kinds), "schema", manifest["schema_version"])
+          PY
+
+  # ---------------------------------------------------------------------
+  # Windows: the Inno Setup installer, plus a portable zip of the same build
+  # ---------------------------------------------------------------------
+  build-windows:
+    needs: guard
+    runs-on: windows-latest
+    # PyInstaller is a few minutes and the install test another few; anything
+    # near an hour is a modal dialog waiting for a click on a runner nobody is
+    # watching.
+    timeout-minutes: 60
+    env:
+      VERSION: ${{ needs.guard.outputs.version }}
+      # Pinned, so a new Inno Setup cannot change the installer between two
+      # builds of the same commit. Bump it on purpose.
+      INNO_VERSION: '6.4.3'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller pytest
+
+      # The modules that read the registry, build paths and launch the
+      # installer, on the platform they were written for. Linux runs them in
+      # the guard with Windows faked; this is the one place they meet the real
+      # thing before a user's machine does.
+      - name: Unit tests on Windows
+        run: |
+          python -m pytest -q -m "not gui" `
+            tests/test_update_apply.py tests/test_update_download.py `
+            tests/test_update_release.py tests/test_install_kind.py `
+            tests/test_updates_view_model.py tests/test_vault_version.py `
+            tests/test_vault_startup.py tests/test_schema_guard.py `
+            tests/test_release_manifest.py
+
+      # Before PyInstaller, and not optional: kroma-player.spec ships
+      # gui/nocturne.kpi, not the QML source, and a frozen build never compiles
+      # anything. Without this the release starts with no interface at all.
+      - name: Compile the official GUI
+        run: python scripts/build-gui
+
+      - name: PyInstaller
+        run: pyinstaller --noconfirm kroma-player.spec
+
+      # kroma-plugin-host is frozen from its own Analysis, with a standard
+      # library collected by hand. Start it on the fixture plugin the way Kroma
+      # does: a module left out, or a broken protocol, fails the release here
+      # rather than on the first user whose plugin imports it.
+      - name: Smoke-test the plugin host
+        run: python scripts/smoke-plugin-host dist/kroma-player
+
+      - name: Install Inno Setup
+        run: choco install innosetup --version=$env:INNO_VERSION --allow-downgrade -y --no-progress
+
+      # AppRepo is this repository, so the links in Settings → Apps lead where
+      # the release is published. The exit code is checked by hand: a native
+      # command's failure does not stop a PowerShell step by itself.
+      - name: Build the installer
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            /DAppVersion=$env:VERSION /DAppRepo=$env:GITHUB_REPOSITORY packaging\kroma-player.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
+
+      # The portable form, from the same build. It does not self-update — the
+      # app reports itself as PORTABLE and offers the releases page instead of a
+      # button — and exists for people who want the folder.
+      - name: Portable zip
+        run: |
+          New-Item -ItemType Directory -Force -Path dist\release | Out-Null
+          Compress-Archive -Path dist\kroma-player\* `
+            -DestinationPath "dist\release\kroma-player-$env:VERSION-windows-x86_64.zip"
+          Move-Item "dist\installer\KromaPlayerSetup-$env:VERSION-x86_64.exe" dist\release\
+
+      # The frozen app's own --smoke-test, then a real install, an update of a
+      # running copy, and an uninstall. See the script for the six steps.
+      - name: Install, update and uninstall
+        run: |
+          pwsh -NoProfile -File packaging\smoke-installer.ps1 `
+            -Dist dist\kroma-player `
+            -Installer "dist\release\KromaPlayerSetup-$env:VERSION-x86_64.exe" `
+            -Version $env:VERSION `
+            -Work "$env:RUNNER_TEMP\kroma smoke test"
+          if ($LASTEXITCODE -ne 0) { throw "the installer smoke test failed" }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/release/
+          if-no-files-found: error
+
+      # Pass or fail: the Inno logs and the smoke reports are what a failure
+      # here is diagnosed from.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-install-logs
+          path: ${{ runner.temp }}/kroma smoke test/logs/
+          if-no-files-found: warn
+
+  # ---------------------------------------------------------------------
+  # Linux: the AppImage, plus a portable tar.gz of the same build
+  # ---------------------------------------------------------------------
+  build-linux:
+    needs: guard
+    # Pinned to 22.04, and it must not be `ubuntu-latest`. An AppImage links
+    # against the glibc it was built on and refuses to start on anything older,
+    # so the build runner sets the oldest distribution the release supports.
+    # Moving this line raises that floor for every user at once.
+    runs-on: ubuntu-22.04
+    env:
+      VERSION: ${{ needs.guard.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install Qt's system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 \
+            libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
+            libxcb-shape0 libxcb-xinerama0 libdbus-1-3 libpulse0
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Compile the official GUI
+        run: python scripts/build-gui
+
+      - name: PyInstaller
+        run: pyinstaller --noconfirm kroma-player.spec
+
+      # kroma-plugin-host is frozen from its own Analysis, with a standard
+      # library collected by hand. Start it on the fixture plugin the way Kroma
+      # does: a module left out, or a broken protocol, fails the release here
+      # rather than on the first user whose plugin imports it.
+      - name: Smoke-test the plugin host
+        run: python scripts/smoke-plugin-host dist/kroma-player
+
+      - name: Fetch appimagetool
+        run: |
+          curl -fsSL -o /usr/local/bin/appimagetool \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          sudo chmod 0755 /usr/local/bin/appimagetool
+
+      # packaging/build-appimage passes --appimage-extract-and-run, which is
+      # what makes appimagetool work on a runner: it mounts the image it builds
+      # through FUSE, and GitHub's runners have no FUSE.
+      - name: Build the AppImage
+        run: packaging/build-appimage "$VERSION"
+
+      - name: Portable tar.gz
+        run: |
+          mkdir -p dist/release
+          # -C dist so the archive holds `kroma-player/…` and not the whole
+          # path from the runner's checkout. tar preserves the executable bit on
+          # dist/kroma-player/kroma-player, which is the one thing an extraction
+          # has to get right for the folder to be runnable at all.
+          tar czf "dist/release/kroma-player-$VERSION-linux-x86_64.tar.gz" \
+            -C dist kroma-player
+          mv "dist/kroma-player-$VERSION-x86_64.AppImage" dist/release/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/release/
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------
+  # Hash everything, describe it, publish it
+  # ---------------------------------------------------------------------
+  publish:
+    needs: [guard, build-windows, build-linux]
+    # A dry run stops at the artifacts.
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-22.04
+    env:
+      VERSION: ${{ needs.guard.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # release-manifest reads the whole version registry, which reaches the
+      # database schema and so SQLAlchemy.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Only the build artifacts. The install logs are diagnostics, not part of
+      # the release.
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist/incoming
+          pattern: '{windows,linux}'
+
+      - name: Collect the artifacts
+        run: |
+          mkdir -p dist/release
+          find dist/incoming -type f -exec mv {} dist/release/ \;
+          ls -l dist/release
+
+      # SHA256SUMS for a human with sha256sum, release.json for the app. The
+      # hashes are computed here, once, over the files that are actually about
+      # to be uploaded — not on the build runners, where they would describe
+      # something that then travelled through two more steps.
+      - name: Write SHA256SUMS and release.json
+        run: python scripts/release-manifest dist/release
+
+      # Without an asset of this kind, every installed Windows copy reads the
+      # release as "nothing for this system" and cannot update.
+      - name: release.json must describe the Windows installer
+        run: |
+          python - dist/release/release.json <<'PY'
+          import json, sys
+          manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+          kinds = [asset["kind"] for asset in manifest["assets"]]
+          assert "windows_installer" in kinds, f"no windows_installer asset in {kinds}"
+          PY
+
+      # Never a prerelease and never a draft: app/update/release.py skips both,
+      # which *is* the stable-channel policy. A release marked either way is
+      # invisible to every copy of the application.
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Kroma Player $VERSION" \
+            --notes-file "docs/changelog/v${VERSION}.md" \
+            --verify-tag \
+            dist/release/*

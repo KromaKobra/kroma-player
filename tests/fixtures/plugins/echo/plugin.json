@@ -1,0 +1,30 @@
+{
+  "id": "test.echo",
+  "name": "Echo",
+  "version": "1.0.0",
+  "api": 13,
+  "author": "Kroma tests",
+  "description": "The plugin the host's own tests start: every behaviour a real plugin might show, on demand.",
+  "backend": { "runtime": "python", "main": "main.py" },
+  "requires": { "programs": [{ "name": "definitely-not-installed-kroma-test" }] },
+  "consent": "agreement.md",
+  "declares": ["runs-programs"],
+  "provides": {
+    "audio": { "roles": ["recording"], "accepts": ["echo:video"] }
+  },
+  "externalIds": [
+    {
+      "entity": "track", "provider": "echo", "kind": "video",
+      "label": "Echo id", "parse": ["^([A-Za-z0-9_-]{11})$"]
+    }
+  ],
+  "contributes": {
+    "settings": {
+      "mode": {
+        "type": "enum", "label": "Mode",
+        "values": ["normal", "crash-on-start", "silent-start"],
+        "default": "normal"
+      }
+    }
+  }
+}

@@ -1,0 +1,503 @@
+#!/usr/bin/env python3
+"""Verify that the documentation still describes the code that exists.
+
+Documentation that drifts is worse than none, so this ships alongside the docs
+rather than after them. It is deliberately cheap: no build step, no external
+dependencies, nothing to install. Run it from the repository root.
+
+    scripts/check-docs            # report, exit 1 on any failure
+    scripts/check-docs --quiet    # only print failures
+
+Six checks, each answering a question the prose cannot answer for itself:
+
+1.  **Paths resolve.** Every ``path/to/file`` cited in backticks exists on disk.
+2.  **Symbols resolve.** Every ``name()`` cited in backticks is a ``def`` or a
+    ``class`` somewhere in the tree — or is on the short allowlist of external
+    names below.
+3.  **Links resolve.** Every relative Markdown link lands on a real file, and
+    every ``#anchor`` on a heading that exists.
+4.  **Diagrams are well formed.** Every ```mermaid block declares a known
+    diagram type and balances its ``subgraph``/``end`` pairs, its brackets and
+    its quotes. This is a structural check, not a full Mermaid parse — there is
+    no Mermaid parser available here, and a real one would be a build step.
+5.  **Every ViewModel is documented.** Every entry in ``CONTEXT_PROPERTIES``
+    (``app/main.py``) is named somewhere under ``docs/architecture/03-components/``.
+    This is what catches a new view model added without documentation.
+6.  **Every event is catalogued.** Every event name emitted through the event
+    bus in ``app/`` appears in the event catalogue.
+
+Why paths and symbols rather than line numbers: a line number rots silently,
+and there is no way to tell a stale one from a good one. A path or a symbol rots
+loudly, and this script is what makes the noise.
+"""
+
+from __future__ import annotations
+
+import argparse
+import ast
+import re
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DOCS_ROOT = REPO_ROOT / "docs"
+COMPONENTS_DIR = DOCS_ROOT / "architecture" / "03-components"
+EVENT_CATALOGUE = DOCS_ROOT / "architecture" / "cross-cutting" / "events-and-invalidation.md"
+
+# Not part of the published set. DOCS_PLAN.md is a scoping document with a
+# finite life: it cites files that do not exist yet by design, and it uses
+# invented symbol names to illustrate what the documentation had to explain.
+# Checking it would mean either weakening the checks or editing the plan to
+# suit them, and neither is worth it.
+EXCLUDED = frozenset({"DOCS_PLAN.md"})
+
+# Top-level directories a backticked path is allowed to start with. Anything
+# else in backticks is prose, a shell fragment, or a symbol — not a path claim.
+SOURCE_DIRS = (
+    "app/", "gui/", "docs/", "tests/", "scripts/", "packaging/", "assets/",
+    "hooks/",
+)
+
+# Symbols cited in the docs that belong to the standard library, to Qt, or to a
+# third-party package, and so will never be found by the repository scan.
+# Keep this list short: every entry is a symbol the checker can no longer
+# verify, so it is a small hole deliberately punched in check 2.
+EXTERNAL_SYMBOLS = frozenset({
+    # standard library
+    "os.replace", "replace", "os.scandir", "scandir", "subprocess.run", "run",
+    "os._exit", "os.execv", "execv", "os.chmod", "chmod", "Popen",
+    "urlopen", "json.loads", "loads", "shutil.move", "move", "rglob", "backup",
+    "getattr", "int", "str", "len", "sum", "sorted", "print", "open",
+    # SQLAlchemy
+    "create_all", "relationship", "sessionmaker", "create_engine", "commit",
+    "flush", "rollback", "close", "text", "select",
+    # Qt / PySide6
+    "qmlRegisterType", "setContextProperty", "addImageProvider", "addImportPath",
+    "beginResetModel", "endResetModel", "beginInsertRows", "endInsertRows",
+    "beginRemoveRows", "endRemoveRows", "dataChanged", "deleteLater", "quit",
+    "wait", "exec", "start", "stop", "moveToThread", "setSource",
+    "showMaximized", "startSystemMove", "startSystemResize", "requestImage",
+    "classBegin", "componentComplete", "setStyle", "connect", "disconnect",
+    "applicationName", "setApplicationName", "applicationVersion",
+    "setDesktopFileName", "sendPostedEvents", "instance",
+    # yt-dlp / mutagen / Pillow
+    "extract_info", "prepare_filename", "YoutubeDL", "search",
+})
+
+# Everything that opens a block Mermaid closes with `end`. `subgraph` is the
+# flowchart one; the rest are sequence-diagram blocks. `else`, `and` and
+# `option` continue a block rather than opening one, so they are not here.
+MERMAID_OPENERS = (
+    "subgraph", "alt ", "opt ", "loop ", "par ", "critical ", "break ",
+    "rect ", "box ",
+)
+
+MERMAID_TYPES = (
+    "flowchart", "graph", "sequenceDiagram", "stateDiagram", "stateDiagram-v2",
+    "erDiagram", "classDiagram", "journey", "gantt", "pie", "gitGraph",
+    "mindmap", "timeline", "quadrantChart",
+)
+
+FENCE_RE = re.compile(r"^([ \t]*)(```+|~~~+)\s*([A-Za-z0-9_+-]*)\s*$")
+INLINE_CODE_RE = re.compile(r"`([^`\n]+)`")
+LINK_RE = re.compile(r"(?<!!)\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
+HEADING_RE = re.compile(r"^#{1,6}\s+(.*?)\s*#*$")
+SYMBOL_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_.]*)\(\)$")
+
+# What an event name looks like: lowercase dotted identifiers, and nothing else.
+# Qt signals are emitted through the same `.emit()` spelling and several of them
+# carry a sentence — "That track is already in your library." — which is dotted
+# in the sense that matters to a naive check and is not an event name.
+EVENT_NAME_RE = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$")
+
+
+# ---------------------------------------------------------------------------
+# Gathering facts about the repository
+# ---------------------------------------------------------------------------
+
+
+def python_files() -> list[Path]:
+    """Every Python file worth scanning for symbol definitions."""
+    out: list[Path] = []
+    for root in ("app", "tests", "scripts", "hooks"):
+        base = REPO_ROOT / root
+        if base.is_dir():
+            out.extend(p for p in base.rglob("*.py") if "__pycache__" not in p.parts)
+    out.append(REPO_ROOT / "run.py")
+    # The PyInstaller spec is Python, is documented like Python, and defines
+    # symbols the build ADR cites.
+    out.extend(REPO_ROOT.glob("*.spec"))
+    # And the extensionless scripts under scripts/, which are Python with a
+    # shebang rather than a suffix — `build-gui`, `check-docs`,
+    # `release-manifest`. They define symbols the docs cite by name, and without
+    # this those citations would be unresolvable no matter how correct they are.
+    # Identified by the shebang rather than by a list, so a new one is covered
+    # the day it is written.
+    scripts = REPO_ROOT / "scripts"
+    if scripts.is_dir():
+        for path in sorted(scripts.iterdir()):
+            if not path.is_file() or path.suffix:
+                continue
+            try:
+                first = path.read_text(encoding="utf-8").splitlines()[:1]
+            except (OSError, UnicodeDecodeError, IndexError):
+                continue
+            if first and first[0].startswith("#!") and "python" in first[0]:
+                out.append(path)
+    return [p for p in out if p.is_file()]
+
+
+def defined_symbols() -> set[str]:
+    """Every ``def`` and ``class`` name defined anywhere in the tree."""
+    names: set[str] = set()
+    for path in python_files():
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError):
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                names.add(node.name)
+    # QML types a GUI declares are cited the same way a Python symbol is, and so
+    # are the functions inside them — a workflow's trigger is often a QML
+    # handler rather than anything in `app/`.
+    qml_function = re.compile(r"^\s*function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+    for path in (REPO_ROOT / "gui").rglob("*.qml"):
+        names.add(path.stem)
+        try:
+            for line in path.read_text(encoding="utf-8").splitlines():
+                match = qml_function.match(line)
+                if match:
+                    names.add(match.group(1))
+        except OSError:
+            continue
+    return names
+
+
+def context_property_names() -> list[str]:
+    """The QML names in ``CONTEXT_PROPERTIES``, read straight from the source."""
+    source = (REPO_ROOT / "app" / "main.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        targets = [t.id for t in node.targets if isinstance(t, ast.Name)]
+        if "CONTEXT_PROPERTIES" not in targets:
+            continue
+        if isinstance(node.value, ast.Dict):
+            return [k.value for k in node.value.keys if isinstance(k, ast.Constant)]
+    return []
+
+
+def emitted_event_names() -> set[str]:
+    """Every literal event name passed to ``EventBus.emit`` under ``app/``."""
+    names: set[str] = set()
+    for path in (REPO_ROOT / "app").rglob("*.py"):
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError):
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+                continue
+            if node.func.attr != "emit" or not node.args:
+                continue
+            first = node.args[0]
+            if not isinstance(first, ast.Constant) or not isinstance(first.value, str):
+                continue
+            # Two tests, either of which is enough. The receiver test is the
+            # semantically right one — it is the event bus being emitted on.
+            # The name test covers a bus reached through some other attribute
+            # name, and is strict enough on its own to exclude the Qt signals
+            # that emit a sentence.
+            receiver = ast.unparse(node.func.value).lower()
+            if receiver.endswith("bus") or EVENT_NAME_RE.match(first.value):
+                names.add(first.value)
+    return names
+
+
+# ---------------------------------------------------------------------------
+# Reading the docs
+# ---------------------------------------------------------------------------
+
+
+class Doc:
+    """One Markdown file, split into prose, inline code and fenced blocks."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.lines = path.read_text(encoding="utf-8").splitlines()
+        self.prose: list[tuple[int, str]] = []
+        self.blocks: list[tuple[int, str, list[str]]] = []  # (line, language, body)
+        self._split()
+
+    def _split(self) -> None:
+        fence: tuple[str, str, int, list[str]] | None = None
+        for number, line in enumerate(self.lines, start=1):
+            match = FENCE_RE.match(line)
+            if fence is None:
+                if match:
+                    fence = (match.group(2), match.group(3), number, [])
+                else:
+                    self.prose.append((number, line))
+                continue
+            marker, language, start, body = fence
+            if match and match.group(2)[0] == marker[0] and not match.group(3):
+                self.blocks.append((start, language, body))
+                fence = None
+            else:
+                body.append(line)
+        if fence is not None:
+            marker, language, start, body = fence
+            self.blocks.append((start, language, body))
+
+    def headings(self) -> set[str]:
+        """GitHub-style anchors for every heading in the file."""
+        anchors: set[str] = set()
+        for _, line in self.prose:
+            match = HEADING_RE.match(line)
+            if not match:
+                continue
+            text = re.sub(r"`([^`]*)`", r"\1", match.group(1))
+            text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)
+            # GitHub's rule: strip punctuation, then replace *each* remaining
+            # space with a hyphen. Collapsing runs instead would make
+            # "`webResult` — the row itself" resolve to one hyphen where the
+            # rendered anchor has two, and every such link would read as broken.
+            slug = re.sub(r"[^\w\s-]", "", text.lower()).strip()
+            anchors.add(re.sub(r"\s", "-", slug))
+        return anchors
+
+    def inline_code(self):
+        for number, line in self.prose:
+            for token in INLINE_CODE_RE.findall(line):
+                yield number, token
+
+
+class Failure:
+    def __init__(self, path: Path, line: int, check: str, detail: str) -> None:
+        self.path = path
+        self.line = line
+        self.check = check
+        self.detail = detail
+
+    def __str__(self) -> str:
+        relative = self.path.relative_to(REPO_ROOT)
+        return f"{relative}:{self.line}: [{self.check}] {self.detail}"
+
+
+# ---------------------------------------------------------------------------
+# The checks
+# ---------------------------------------------------------------------------
+
+
+def check_paths(doc: Doc, failures: list[Failure]) -> int:
+    """Check 1 — every backticked repository path exists."""
+    checked = 0
+    for line, token in doc.inline_code():
+        candidate = token.strip()
+        if not candidate.startswith(SOURCE_DIRS):
+            continue
+        # Trim the decorations a path can pick up in prose.
+        candidate = candidate.split()[0].rstrip(",.;:")
+        if any(c in candidate for c in "*<>|$"):
+            continue
+        checked += 1
+        if not (REPO_ROOT / candidate).exists():
+            failures.append(Failure(doc.path, line, "path", f"{candidate} does not exist"))
+    return checked
+
+
+def check_symbols(doc: Doc, symbols: set[str], failures: list[Failure]) -> int:
+    """Check 2 — every backticked ``name()`` is defined somewhere."""
+    checked = 0
+    for line, token in doc.inline_code():
+        match = SYMBOL_RE.match(token.strip())
+        if not match:
+            continue
+        cited = match.group(1)
+        if cited in EXTERNAL_SYMBOLS:
+            continue
+        name = cited.rsplit(".", 1)[-1]
+        if name in EXTERNAL_SYMBOLS:
+            continue
+        checked += 1
+        if name not in symbols:
+            failures.append(
+                Failure(doc.path, line, "symbol", f"{cited} is not defined anywhere")
+            )
+    return checked
+
+
+def check_links(doc: Doc, docs: dict[Path, Doc], failures: list[Failure]) -> int:
+    """Check 3 — every relative link, and every anchor, resolves."""
+    checked = 0
+    for number, line in doc.prose:
+        for target in LINK_RE.findall(line):
+            if target.startswith(("http://", "https://", "mailto:")):
+                continue
+            checked += 1
+            anchor = ""
+            if "#" in target:
+                target, anchor = target.split("#", 1)
+            if not target:
+                destination = doc.path
+            else:
+                destination = (doc.path.parent / target).resolve()
+                if not destination.exists():
+                    failures.append(
+                        Failure(doc.path, number, "link", f"{target} does not exist")
+                    )
+                    continue
+            if anchor and destination.suffix == ".md":
+                other = docs.get(destination) or Doc(destination)
+                if anchor.lower() not in other.headings():
+                    failures.append(
+                        Failure(
+                            doc.path, number, "link",
+                            f"{target}#{anchor} — no such heading",
+                        )
+                    )
+    return checked
+
+
+def check_mermaid(doc: Doc, failures: list[Failure]) -> int:
+    """Check 4 — every Mermaid block is structurally sound."""
+    checked = 0
+    for start, language, body in doc.blocks:
+        if language != "mermaid":
+            continue
+        checked += 1
+        stripped = [line for line in body if line.strip() and not line.strip().startswith("%%")]
+        if not stripped:
+            failures.append(Failure(doc.path, start, "mermaid", "block is empty"))
+            continue
+        first = stripped[0].strip()
+        if not first.startswith(MERMAID_TYPES):
+            failures.append(
+                Failure(doc.path, start, "mermaid", f"unknown diagram type: {first!r}")
+            )
+        depth = 0
+        for offset, line in enumerate(body):
+            token = line.strip()
+            if token.startswith(MERMAID_OPENERS):
+                depth += 1
+            elif token == "end":
+                depth -= 1
+                if depth < 0:
+                    failures.append(
+                        Failure(doc.path, start + offset + 1, "mermaid", "unmatched 'end'")
+                    )
+                    depth = 0
+            if token.count('"') % 2:
+                failures.append(
+                    Failure(doc.path, start + offset + 1, "mermaid", "odd number of quotes")
+                )
+        if depth:
+            failures.append(
+                Failure(doc.path, start, "mermaid", f"{depth} unclosed subgraph(s)")
+            )
+        # Bracket balance is only meaningful where brackets delimit node shapes.
+        # An erDiagram spells its cardinalities `||--o{` and `}o--||`, so a
+        # balanced diagram counts as unbalanced; a classDiagram and a mindmap
+        # have their own uses for braces.
+        if not first.startswith(("flowchart", "graph")):
+            continue
+        text = "\n".join(body)
+        for opener, closer in (("[", "]"), ("(", ")"), ("{", "}")):
+            if text.count(opener) != text.count(closer):
+                failures.append(
+                    Failure(
+                        doc.path, start, "mermaid",
+                        f"unbalanced {opener}{closer} "
+                        f"({text.count(opener)} vs {text.count(closer)})",
+                    )
+                )
+    return checked
+
+
+def check_view_models(corpus: str, failures: list[Failure]) -> int:
+    """Check 5 — every context property is named in the component docs."""
+    names = context_property_names()
+    for name in names:
+        if name not in corpus:
+            failures.append(
+                Failure(
+                    COMPONENTS_DIR, 0, "viewmodel",
+                    f"{name} is a context property with no mention in "
+                    f"docs/architecture/03-components/",
+                )
+            )
+    return len(names)
+
+
+def check_events(failures: list[Failure]) -> int:
+    """Check 6 — every emitted event name is in the catalogue."""
+    names = emitted_event_names()
+    if not EVENT_CATALOGUE.is_file():
+        failures.append(
+            Failure(EVENT_CATALOGUE, 0, "event", "the event catalogue is missing")
+        )
+        return len(names)
+    catalogue = EVENT_CATALOGUE.read_text(encoding="utf-8")
+    for name in sorted(names):
+        if name not in catalogue:
+            failures.append(
+                Failure(EVENT_CATALOGUE, 0, "event", f"{name} is emitted but not catalogued")
+            )
+    return len(names)
+
+
+# ---------------------------------------------------------------------------
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Check the documentation against the code.")
+    parser.add_argument("--quiet", action="store_true", help="only print failures")
+    args = parser.parse_args()
+
+    if not DOCS_ROOT.is_dir():
+        print("No docs/ directory found — nothing to check.", file=sys.stderr)
+        return 1
+
+    paths = [p for p in sorted(DOCS_ROOT.rglob("*.md")) if p.name not in EXCLUDED]
+    docs = {path.resolve(): Doc(path) for path in paths}
+    symbols = defined_symbols()
+    failures: list[Failure] = []
+    counts = {"path": 0, "symbol": 0, "link": 0, "mermaid": 0}
+
+    for doc in docs.values():
+        counts["path"] += check_paths(doc, failures)
+        counts["symbol"] += check_symbols(doc, symbols, failures)
+        counts["link"] += check_links(doc, docs, failures)
+        counts["mermaid"] += check_mermaid(doc, failures)
+
+    component_corpus = "\n".join(
+        p.read_text(encoding="utf-8") for p in COMPONENTS_DIR.rglob("*.md")
+    ) if COMPONENTS_DIR.is_dir() else ""
+    view_models = check_view_models(component_corpus, failures)
+    events = check_events(failures)
+
+    if not args.quiet:
+        print(f"{len(docs)} document(s) checked")
+        print(f"  {counts['path']:5d} path reference(s)")
+        print(f"  {counts['symbol']:5d} symbol reference(s)")
+        print(f"  {counts['link']:5d} internal link(s)")
+        print(f"  {counts['mermaid']:5d} mermaid diagram(s)")
+        print(f"  {view_models:5d} view model(s)")
+        print(f"  {events:5d} event name(s)")
+
+    if failures:
+        print()
+        for failure in failures:
+            print(failure)
+        print(f"\n{len(failures)} problem(s) found.")
+        return 1
+
+    if not args.quiet:
+        print("\nEverything checks out.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

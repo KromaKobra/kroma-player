@@ -1,0 +1,10 @@
+{
+  "name": "nocturne",
+  "title": "Nocturne",
+  "version": "3.0.0",
+  "api_version": 13,
+  "entry": "main.qml",
+  "author": "Claude",
+  "description": "The official Kroma Player interface — an ambient layout that takes its colour from the artwork, in dark or light or whichever the desktop is on, with a navigation rail, editable synced lyrics you can retime by ear, and six accent themes.",
+  "homepage": "https://github.com/KromaKobra/kroma-player"
+}

@@ -1,0 +1,185 @@
+#!/usr/bin/env python3
+"""Write the two sidecar files that go beside a release's build artifacts.
+
+    scripts/release-manifest dist/release
+
+Reads every file already in that directory, and writes two more into it:
+
+``SHA256SUMS``
+    Plain ``sha256sum`` format, so anybody can verify a download with the tool
+    they already have and no knowledge of anything in this repository.
+
+``release.json``
+    What the application parses. The GitHub API lists a release's assets with
+    their names, sizes and download URLs, but **no hash** — so without this the
+    updater would have to scrape a digest out of ``SHA256SUMS`` by matching a
+    filename with a string operation, which is brittle in exactly the place
+    brittleness is unacceptable. It also carries what the API has nowhere to
+    put: ``kind``, which is how the app picks the artifact matching the way
+    *it* was installed rather than guessing from a file extension, and
+    ``vault_version`` and ``schema_version``, which are what let the updater
+    warn before an update that migrates the user's library one-way.
+
+Generated from ``version_report()`` rather than from anything passed in, so the
+numbers in the manifest cannot drift from the build they describe. That reaches
+into :mod:`app.database.schema`, so it needs the application's requirements
+installed — SQLAlchemy above all.
+
+An asset whose name this script does not recognise is listed with an empty
+``kind``: the manifest stays complete and verifiable, and ``asset_for()`` simply
+never selects it. Refusing to write the file over an unfamiliar asset would fail
+the release for something that is nobody's emergency.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from app.database.schema import SCHEMA_VERSION  # noqa: E402
+from app.versions import (  # noqa: E402
+    APP_VERSION,
+    GUI_API_VERSION,
+    MIN_GUI_API_VERSION,
+    VAULT_VERSION,
+    version_report,
+)
+
+MANIFEST_NAME = "release.json"
+SUMS_NAME = "SHA256SUMS"
+
+# Read in 1 MB blocks: an AppImage is a couple of hundred megabytes and reading
+# one whole into memory to hash it is pointless on a runner with 7 GB.
+CHUNK = 1 << 20
+
+
+def classify(name: str) -> str:
+    """Return the ``InstallKind`` this artifact updates, or ``""``.
+
+    Matched on the filename because the filename is the contract — the naming
+    scheme is fixed in ADR 0013 and in ``.github/workflows/release.yml``, and
+    both installable artifacts are unambiguous under it.
+
+    The two portable archives get their own kinds rather than being folded
+    together. Neither is ever selected by the updater (a portable copy is
+    ineligible; see ``app/update/install_kind.py``), but naming them is what
+    makes the manifest a complete description of the release rather than a list
+    of the parts the app happens to care about.
+    """
+    lowered = name.lower()
+    if lowered.endswith(".exe") and "setup" in lowered:
+        return "windows_installer"
+    if lowered.endswith(".appimage"):
+        return "appimage"
+    if lowered.endswith(".zip") and "windows" in lowered:
+        return "windows_portable"
+    if lowered.endswith(".tar.gz") and "linux" in lowered:
+        return "linux_portable"
+    return ""
+
+
+def architecture(name: str) -> str:
+    """Return the architecture named in *name*, normalised, or ``""``.
+
+    The same normalisation ``packaging/build-appimage`` applies, so a build and
+    the app that later looks for its output agree on the spelling — Windows
+    reports ``AMD64`` and Linux reports ``x86_64`` for the same machine.
+    """
+    lowered = name.lower()
+    for token, arch in (
+        ("x86_64", "x86_64"),
+        ("amd64", "x86_64"),
+        ("aarch64", "aarch64"),
+        ("arm64", "aarch64"),
+    ):
+        if token in lowered:
+            return arch
+    return ""
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(CHUNK), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def build(directory: Path) -> tuple[dict, str]:
+    """Return the manifest and the ``SHA256SUMS`` text for *directory*."""
+    artifacts = sorted(
+        path
+        for path in directory.iterdir()
+        if path.is_file() and path.name not in (MANIFEST_NAME, SUMS_NAME)
+    )
+    if not artifacts:
+        raise SystemExit(f"release-manifest: nothing to describe in {directory}")
+
+    assets = []
+    lines = []
+    for path in artifacts:
+        digest = sha256(path)
+        assets.append(
+            {
+                "name": path.name,
+                "kind": classify(path.name),
+                "arch": architecture(path.name),
+                "size": path.stat().st_size,
+                "sha256": digest,
+            }
+        )
+        # Two spaces, then the bare filename — `sha256sum -c` reads exactly this
+        # and resolves the name relative to the working directory, so a path
+        # here would make the file unverifiable anywhere but the build runner.
+        lines.append(f"{digest}  {path.name}")
+
+    manifest = {
+        "version": APP_VERSION,
+        "vault_version": VAULT_VERSION,
+        "schema_version": SCHEMA_VERSION,
+        "gui_api_version": GUI_API_VERSION,
+        "min_gui_api_version": MIN_GUI_API_VERSION,
+        "assets": assets,
+        # The rest of the registry, for diagnostics and for whatever the next
+        # question turns out to be. Costs a few hundred bytes and means a
+        # release can always be asked what it was built from.
+        "versions": version_report(),
+    }
+    return manifest, "\n".join(lines) + "\n"
+
+
+def main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument(
+        "directory",
+        type=Path,
+        help="the folder holding the built artifacts; both files are written into it",
+    )
+    args = parser.parse_args(argv)
+
+    directory: Path = args.directory
+    if not directory.is_dir():
+        raise SystemExit(f"release-manifest: no such directory: {directory}")
+
+    manifest, sums = build(directory)
+
+    (directory / MANIFEST_NAME).write_text(
+        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+    )
+    (directory / SUMS_NAME).write_text(sums, encoding="utf-8")
+
+    print(f"Kroma Player {APP_VERSION} — {len(manifest['assets'])} assets")
+    for asset in manifest["assets"]:
+        print(f"  {asset['name']}  {asset['kind'] or '(unclassified)'}  {asset['size']} bytes")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

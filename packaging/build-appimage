@@ -1,0 +1,88 @@
+#!/bin/sh
+# Assemble dist/kroma-player/ into a single-file AppImage.
+#
+#     scripts/build-gui && pyinstaller kroma-player.spec
+#     packaging/build-appimage 1.2.0
+#
+# Writes dist/kroma-player-<version>-<arch>.AppImage.
+#
+# Why an AppImage rather than a .deb, a Flatpak or a tarball: it is one
+# executable file that runs on any distribution, and — the reason it is the
+# primary Linux artifact here — it makes self-update trivially safe. $APPIMAGE
+# holds the path to the running file, and on Linux os.replace() over a running
+# executable is fine: the kernel keeps the old inode alive for the process (and
+# for the FUSE mount behind it) until it exits. Download, verify, replace,
+# chmod, re-exec. No directory swap, no helper process, and no window in which
+# the application does not exist on disk. See ADR 0013.
+#
+# POSIX sh on purpose: this runs on a CI runner and on a maintainer's machine,
+# and neither should need bash for forty lines of file copying.
+
+set -eu
+
+REPO_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+VERSION=${1:-}
+
+if [ -z "$VERSION" ]; then
+    # Read it out of the application rather than asking for it twice. The
+    # constant is the release's identity; a version passed on the command line
+    # that disagreed with it would produce an AppImage whose filename lies.
+    VERSION=$(cd "$REPO_ROOT" && python3 -c 'from app.versions import APP_VERSION; print(APP_VERSION)')
+fi
+
+# The same normalisation app/update/release.py applies to an asset's arch, so a
+# build and the app that later looks for it agree on the spelling.
+ARCH=$(uname -m)
+case "$ARCH" in
+    AMD64|amd64|x86_64) ARCH=x86_64 ;;
+    aarch64|arm64) ARCH=aarch64 ;;
+esac
+
+DIST="$REPO_ROOT/dist/kroma-player"
+APPDIR="$REPO_ROOT/dist/AppDir"
+OUTPUT="$REPO_ROOT/dist/kroma-player-$VERSION-$ARCH.AppImage"
+
+if [ ! -x "$DIST/kroma-player" ]; then
+    echo "build-appimage: no PyInstaller output at $DIST" >&2
+    echo "                run: scripts/build-gui && pyinstaller kroma-player.spec" >&2
+    exit 1
+fi
+
+echo "Assembling AppDir for Kroma Player $VERSION ($ARCH)"
+rm -rf "$APPDIR"
+mkdir -p "$APPDIR/usr/bin"
+
+# The onedir tree, whole. cp -a keeps the executable bit on the launcher and on
+# the Qt plugins beside it, which is the difference between an AppImage that
+# runs and one that reports "Permission denied" from somewhere inside _internal.
+cp -a "$DIST/." "$APPDIR/usr/bin/"
+
+# The desktop entry is the one already installed for source checkouts by
+# scripts/install-desktop-entry, reused rather than reinvented — it carries
+# StartupWMClass=kroma-player, which has to keep matching
+# setDesktopFileName() in app/main.py for the shell to find the window's icon.
+# appimagetool requires it at the AppDir root; the copy under usr/share is what
+# desktop integration tools install if the user asks for one.
+cp "$REPO_ROOT/packaging/kroma-player.desktop" "$APPDIR/kroma-player.desktop"
+mkdir -p "$APPDIR/usr/share/applications"
+cp "$REPO_ROOT/packaging/kroma-player.desktop" "$APPDIR/usr/share/applications/"
+
+# The icon, at the AppDir root under the name the .desktop's Icon= line gives,
+# and in the hicolor tree where an installed entry would look for it.
+cp "$REPO_ROOT/assets/icon.png" "$APPDIR/kroma-player.png"
+mkdir -p "$APPDIR/usr/share/icons/hicolor/512x512/apps"
+cp "$REPO_ROOT/assets/icon.png" "$APPDIR/usr/share/icons/hicolor/512x512/apps/kroma-player.png"
+
+cp "$REPO_ROOT/packaging/AppRun" "$APPDIR/AppRun"
+chmod 0755 "$APPDIR/AppRun"
+
+# appimagetool mounts the image it builds through FUSE, which GitHub's runners
+# do not provide — hence --appimage-extract-and-run, which unpacks the tool
+# itself instead. Harmless everywhere else, so it is unconditional rather than
+# something CI has to remember to pass.
+: "${APPIMAGETOOL:=appimagetool}"
+echo "Building $OUTPUT"
+ARCH="$ARCH" "$APPIMAGETOOL" --appimage-extract-and-run "$APPDIR" "$OUTPUT"
+
+chmod 0755 "$OUTPUT"
+echo "Built $OUTPUT"

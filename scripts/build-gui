@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+"""Compile a GUI source tree into the ``.kpi`` bundle the application loads.
+
+    scripts/build-gui                 # the official GUI, nocturne
+    scripts/build-gui nocturne        # the same thing, said out loud
+    scripts/build-gui ~/src/mygui     # a package that lives somewhere else
+    scripts/build-gui a b             # several at once
+
+A bare name is read from ``gui/<name>/``; anything path-shaped is read where it
+is. Either way the bundle is written beside the source folder as
+``<name>.kpi``, along with ``<name>.kpi.json`` — the build record that lets a
+launch decide whether the installed copy is stale without opening either file.
+
+You do not normally have to run this. A checkout rebuilds the bundle by itself
+when the QML has changed — see ``app/gui/installer.py`` — and this is the same
+work done deliberately: before packaging a release (``kroma-player.spec`` ships
+the compiled bundle, not the source), or when ``KROMA_NO_GUI_BUILD=1`` has the
+automatic rebuild switched off.
+
+Needs Qt's ``rcc``. It looks on ``PATH`` and in the usual Qt and PySide6
+locations; ``KROMA_RCC=/path/to/rcc`` settles it if yours is somewhere else.
+"""
+
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from app.gui.compiler import main  # noqa: E402
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -1,0 +1,29 @@
+#!/bin/sh
+# The interpreter the editor should launch: whichever one the dev shell resolves
+# to *right now*.
+#
+# VS Code's Python extension remembers the interpreter path it picked, and on
+# Nix every flake edit mints a fresh store path. The remembered one keeps
+# working — it is simply the *previous* dev shell — so the debugger goes on
+# running against superseded dependencies while the terminal has already moved.
+# That is not a visible failure: it surfaces much later as the library
+# misbehaving. Bumping a dependency and still seeing the old failure in the app,
+# but not in the terminal, is what it looked like the first time.
+#
+# Pinning a store path in settings.json would only move the staleness. Resolving
+# here, at spawn, is what keeps the two on the same env for good.
+set -eu
+
+here=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+
+# direnv's own "loading .envrc" chatter goes to stderr, so it never reaches an
+# extension probing this interpreter by reading its stdout. Left alone rather
+# than silenced: when the flake fails to evaluate, that stderr is the only thing
+# saying why the debugger would not start.
+if command -v direnv >/dev/null 2>&1; then
+    exec direnv exec "$here" python "$@"
+fi
+
+# No direnv (a bare checkout, or an editor started outside the user's shell).
+# Slower, since it evaluates the flake, but it cannot be stale.
+exec nix develop "$here" --command python "$@"

@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+"""Start the plugin host the way Kroma does, and check it speaks the protocol.
+
+    scripts/smoke-plugin-host dist/kroma-player     # a frozen build
+    scripts/smoke-plugin-host                       # this checkout, from source
+
+Runs the fixture plugin (tests/fixtures/plugins/echo) under the
+``kroma-plugin-host`` executable a release ships — or under ``python -I -S
+app/plugins/host_entry.py`` with no argument — and asks it to initialize, echo,
+print to stdout (which must not reach the protocol), and import the parts of the
+standard library a plugin's vendored packages lean on. Exits non-zero on the
+first thing that is wrong.
+
+Standard library only, so the release workflow can run it with any Python
+before anything is installed. The frozen host is the point: its standard
+library is collected by hand in kroma-player.spec, and a module left out there
+fails only when some user's plugin first imports it.
+"""
+from __future__ import annotations
+
+import json
+import os
+import queue
+import subprocess
+import sys
+import threading
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[1]
+FIXTURE = REPO / "tests" / "fixtures" / "plugins" / "echo"
+TIMEOUT = 30
+
+# What real plugins' dependencies import: HTTP and TLS, JSON, email parsing
+# (http.client), compression, concurrency, dates and the rest.
+MODULES = [
+    "ssl", "http.client", "urllib.request", "urllib.parse", "json", "email.parser",
+    "email.message", "zlib", "gzip", "bz2", "lzma", "zipfile", "base64", "hashlib",
+    "hmac", "secrets", "uuid", "datetime", "zoneinfo", "locale", "gettext", "decimal",
+    "fractions", "random", "statistics", "re", "unicodedata", "string", "textwrap",
+    "html.parser", "xml.etree.ElementTree", "csv", "sqlite3", "concurrent.futures",
+    "threading", "multiprocessing", "subprocess", "selectors", "socket", "asyncio",
+    "logging", "logging.handlers", "tempfile", "shutil", "glob", "fnmatch",
+    "pathlib", "importlib.metadata", "importlib.resources", "typing", "dataclasses",
+    "contextlib", "functools", "itertools", "collections", "copy", "pickle",
+    "struct", "array", "mimetypes", "netrc", "http.cookiejar", "codecs",
+    "encodings.idna", "ctypes", "platform", "getpass", "shlex", "signal", "traceback",
+    "warnings", "weakref", "inspect", "ast", "tokenize", "difflib", "pprint",
+]
+
+
+def command(dist: str | None) -> list[str]:
+    if dist:
+        suffix = ".exe" if os.name == "nt" else ""
+        host = Path(dist) / f"kroma-plugin-host{suffix}"
+        if not host.is_file():
+            sys.exit(f"no plugin host at {host}")
+        return [str(host), str(FIXTURE)]
+    return [sys.executable, "-I", "-S", str(REPO / "app" / "plugins" / "host_entry.py"),
+            str(FIXTURE)]
+
+
+def main(argv: list[str]) -> int:
+    cmd = command(argv[1] if len(argv) > 1 else None)
+    print("starting:", " ".join(cmd))
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    process = subprocess.Popen(
+        cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        creationflags=flags,
+    )
+    replies: "queue.Queue[str]" = queue.Queue()
+    errors: list[str] = []
+
+    def read_out():
+        for raw in process.stdout:
+            replies.put(raw.decode("utf-8", "replace"))
+
+    def read_err():
+        for raw in process.stderr:
+            errors.append(raw.decode("utf-8", "replace").rstrip())
+
+    threading.Thread(target=read_out, daemon=True).start()
+    threading.Thread(target=read_err, daemon=True).start()
+
+    next_id = 0
+
+    def call(method, params=None):
+        nonlocal next_id
+        next_id += 1
+        message = {"jsonrpc": "2.0", "id": next_id, "method": method, "params": params or {}}
+        process.stdin.write((json.dumps(message) + "\n").encode("utf-8"))
+        process.stdin.flush()
+        while True:
+            try:
+                line = replies.get(timeout=TIMEOUT)
+            except queue.Empty:
+                raise SystemExit(f"{method}: no answer in {TIMEOUT}s\n" + "\n".join(errors))
+            try:
+                reply = json.loads(line)
+            except ValueError:
+                raise SystemExit(f"{method}: not JSON on the protocol: {line!r}")
+            if reply.get("id") != next_id:
+                continue  # a notification — progress, a log line
+            if "error" in reply:
+                raise SystemExit(f"{method}: {reply['error']}")
+            return reply.get("result")
+
+    try:
+        started = call("initialize", {"api": 13, "hostVersion": "smoke", "settings": {},
+                                      "programs": {}, "consented": False, "dataDir": ""})
+        assert "echo" in started["methods"], started
+        call("ping")
+        assert call("echo", {"value": "hello"})["echo"] == "hello"
+        assert call("print") == {"ok": True}, "stdout from a plugin reached the protocol"
+        missing = call("imports", {"modules": MODULES})["missing"]
+        if missing:
+            raise SystemExit("the plugin host is missing standard library modules:\n  "
+                             + "\n  ".join(missing))
+        call("shutdown")
+    finally:
+        try:
+            process.stdin.close()
+        except OSError:
+            pass
+        try:
+            process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            process.kill()
+    print("plugin host OK")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

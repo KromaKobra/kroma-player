@@ -1,0 +1,111 @@
+#!/bin/sh
+# Install the XDG desktop entry and icon into the current user's data directory.
+#
+# The desktop entry is what makes Kroma Player a first-class application to the
+# desktop rather than an anonymous window. MPRIS advertises its basename in the
+# DesktopEntry property, and the shell reads the name and icon from it to draw
+# the media widget — with no entry installed, the system media controls fall
+# back to bare text. It also gives the app a launcher and file associations.
+#
+# Everything is written to per-user XDG directories, which are unmanaged even on
+# NixOS, so this is safe to run on any distribution and needs no root.
+#
+# Usage:
+#   scripts/install-desktop-entry [--exec COMMAND] [--uninstall]
+#
+#   --exec COMMAND  What the launcher runs. Defaults to a command that starts
+#                   this checkout through its dev shell, which is what you want
+#                   when running from source. A packaged build passes the
+#                   installed binary instead, e.g. --exec /usr/bin/kroma-player.
+set -eu
+
+here=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+
+data_home=${XDG_DATA_HOME:-$HOME/.local/share}
+apps_dir="$data_home/applications"
+icon_dir="$data_home/icons/hicolor/512x512/apps"
+
+desktop_src="$here/packaging/kroma-player.desktop"
+desktop_dst="$apps_dir/kroma-player.desktop"
+icon_src="$here/assets/icon.png"
+icon_dst="$icon_dir/kroma-player.png"
+
+exec_cmd=""
+uninstall=0
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --exec)
+            [ $# -ge 2 ] || { echo "--exec needs a command" >&2; exit 2; }
+            exec_cmd=$2
+            shift 2
+            ;;
+        --uninstall)
+            uninstall=1
+            shift
+            ;;
+        -h|--help)
+            sed -n '2,25p' "$0"
+            exit 0
+            ;;
+        *)
+            echo "unknown option: $1" >&2
+            exit 2
+            ;;
+    esac
+done
+
+refresh_caches() {
+    # Both are best-effort: many desktops watch the directories directly, and
+    # neither tool is guaranteed to exist. A failure here does not mean the
+    # entry was not installed, so it must not fail the script.
+    if command -v update-desktop-database >/dev/null 2>&1; then
+        update-desktop-database "$apps_dir" >/dev/null 2>&1 || true
+    fi
+    if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+        gtk-update-icon-cache -f -t "$data_home/icons/hicolor" >/dev/null 2>&1 || true
+    fi
+}
+
+if [ "$uninstall" -eq 1 ]; then
+    rm -f "$desktop_dst" "$icon_dst"
+    refresh_caches
+    echo "Removed $desktop_dst"
+    echo "Removed $icon_dst"
+    exit 0
+fi
+
+[ -f "$desktop_src" ] || { echo "missing $desktop_src" >&2; exit 1; }
+[ -f "$icon_src" ] || { echo "missing $icon_src" >&2; exit 1; }
+
+if [ -z "$exec_cmd" ]; then
+    # Running from source: go through the dev shell so the launcher gets the
+    # same interpreter and Qt paths the terminal does. Quoted because a checkout
+    # path may contain spaces.
+    exec_cmd="nix develop \"$here\" --command python \"$here/run.py\""
+fi
+
+mkdir -p "$apps_dir" "$icon_dir"
+
+# The icon is copied rather than symlinked: a symlink into the checkout breaks
+# the launcher's icon if the repo moves, and it is 100 KB.
+cp -f "$icon_src" "$icon_dst"
+
+# Rewrite only the Exec line, so the rest of the entry stays the single source
+# of truth in packaging/.
+awk -v cmd="$exec_cmd" '
+    /^Exec=/ { print "Exec=" cmd " %U"; next }
+    { print }
+' "$desktop_src" > "$desktop_dst.tmp"
+mv -f "$desktop_dst.tmp" "$desktop_dst"
+chmod 644 "$desktop_dst"
+
+refresh_caches
+
+echo "Installed $desktop_dst"
+echo "Installed $icon_dst"
+echo "Exec=$exec_cmd %U"
+
+if command -v desktop-file-validate >/dev/null 2>&1; then
+    desktop-file-validate "$desktop_dst" || true
+fi

@@ -1,0 +1,13 @@
+PySide6>=6.6.0      # Qt for Python (GUI framework)
+SQLAlchemy>=2.0     # Sqlite database management
+mutagen>=1.47       # Audio metadata editor (for database stashing)
+pillow>=12.2.0      # Image processing + AVIF encode/decode for album art (bundles libavif)
+syncedlyrics>=1.0.1 # Synced (LRC) lyrics lookup when a track is imported
+
+# Not a Python package — install separately and put on PATH (see
+# kroma-player.spec and app/utils/binaries.py):
+#   ffmpeg (with ffprobe)  audio extraction and transcoding
+#
+# Online search and fetching audio are plugins, not part of Kroma Player: each
+# plugin ships its own Python dependencies in its .kpp and lists the programs
+# it needs in its manifest, which Settings → System checks (ADR 0015).
