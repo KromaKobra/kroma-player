@@ -56,7 +56,7 @@ def _windows(monkeypatch, tmp_path) -> Path:
     monkeypatch.setattr(sys, "platform", "win32")
     local = tmp_path / "AppData" / "Local"
     monkeypatch.setenv("LOCALAPPDATA", str(local))
-    return local / "kord" / "logs" / "kroma-player.log"
+    return local / "Kroma" / "logs" / "kroma-player.log"
 
 
 def _added(before: list) -> list:

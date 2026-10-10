@@ -5,9 +5,9 @@ the library a portable, self-contained directory. That leaves one thing with
 nowhere to go: where the vault actually is. That answer is kept here, in the
 per-user application data folder:
 
-    Windows   %APPDATA%\\kord\\kord-config.json      (AppData/Roaming)
-    macOS     ~/Library/Application Support/kord/kord-config.json
-    Linux     ~/.config/kord/kord-config.json
+    Windows   %APPDATA%\\Kroma\\kord-config.json      (AppData/Roaming)
+    macOS     ~/Library/Application Support/Kroma/kord-config.json
+    Linux     ~/.config/Kroma/kord-config.json
 
 The file is a plain JSON object. Unknown keys are preserved on write, so a newer
 build adding settings here will not have them wiped by an older one.
@@ -23,7 +23,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-CONFIG_DIR_NAME = "kord"
+CONFIG_DIR_NAME = "Kroma"
 CONFIG_FILENAME = "kord-config.json"
 CONFIG_VERSION = 1
 
@@ -45,7 +45,7 @@ def app_data_root() -> Path:
 
 
 def kord_dir() -> Path:
-    """Return the ``kord`` folder inside the application data folder.
+    """Return the ``Kroma`` folder inside the application data folder.
 
     Uses ``QGuiApplication.applicationName()`` when a Qt application instance
     exists, so it always agrees with what was passed to Qt. Falls back to the

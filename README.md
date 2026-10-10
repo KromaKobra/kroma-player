@@ -52,8 +52,8 @@ When an update changes how your library is stored, Kroma Player first copies the
 | What | Where |
 | --- | --- |
 | Your library: music, database, settings | the vault folder you chose, e.g. `Music\venomvault` |
-| Which vault to open | `%APPDATA%\kord\kord-config.json` |
-| Log files | `%LOCALAPPDATA%\kord\logs\` |
+| Which vault to open | `%APPDATA%\Kroma\kord-config.json` |
+| Log files | `%LOCALAPPDATA%\Kroma\logs\` |
 | Copies taken before a library upgrade | `<vault>\.data\upgrade-snapshots\` |
 | The app itself | `%LOCALAPPDATA%\Programs\Kroma Player` |
 

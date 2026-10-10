@@ -9,10 +9,10 @@ that died at startup did so without a trace.
 
 So on Windows the log is also a file:
 
-    %LOCALAPPDATA%\\kord\\logs\\kroma-player.log      (1 MB, three old copies kept)
+    %LOCALAPPDATA%\\Kroma\\logs\\kroma-player.log      (1 MB, three old copies kept)
 
 Local rather than roaming AppData, because a log describes this machine and has
-no business following the user to another one. ``kord`` for the reason
+no business following the user to another one. ``Kroma`` for the reason
 :func:`app.config.kord_config.kord_dir` gives — it is the application's name to
 Qt, and the config already lives under it.
 

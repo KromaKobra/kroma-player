@@ -334,7 +334,7 @@ exe = EXE(
     upx=False,
     console=False,       # windowed — no terminal window. Flip to True to see
                          # tracebacks when debugging a frozen build; on Windows
-                         # they also land in %LOCALAPPDATA%\kord\logs.
+                         # they also land in %LOCALAPPDATA%\Kroma\logs.
     icon="assets/icon.ico",
     version=windows_version_info(APP_NAME, EXE_NAME),
 )

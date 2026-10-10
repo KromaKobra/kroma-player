@@ -224,7 +224,7 @@ finally {
     if ($installRoot) { Stop-Kroma $installRoot }
     Stop-Kroma $Work
     # The app's own log, which is where a smoke stage's traceback also goes.
-    $appLogs = Join-Path $env:LOCALAPPDATA 'kord\logs'
+    $appLogs = Join-Path $env:LOCALAPPDATA 'Kroma\logs'
     if (Test-Path -LiteralPath $appLogs) {
         Copy-Item -Path (Join-Path $appLogs '*') -Destination $Logs -ErrorAction SilentlyContinue
     }

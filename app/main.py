@@ -350,9 +350,8 @@ def _announce_audio_identity() -> None:
     the whole point: the former wins over what the client sets, the latter only
     supplies defaults the client may replace. Qt Multimedia sets
     ``application.name`` itself, from ``QCoreApplication::applicationName()`` —
-    which is ``"kord"`` here and must stay that way, because the config
-    directory is derived from it. With plain ``PULSE_PROP`` the stream comes out
-    labelled "kord"; with the override it comes out labelled "Kroma Player".
+    which is ``"Kroma"`` here. With plain ``PULSE_PROP`` the stream comes out
+    labelled "Kroma"; with the override it comes out labelled "Kroma Player".
 
     Must run before the first ``QGuiApplication``: the client proplist is read
     once, when the connection is opened, and Qt Multimedia opens it lazily off
@@ -425,13 +424,7 @@ def _main():
     QQuickStyle.setStyle("Fusion")
     app = QGuiApplication(sys.argv)
     app.setOrganizationName("kroma")
-    # Do not change this to the display name. kord_dir() in
-    # app/config/kord_config.py derives the config directory from
-    # applicationName(), so renaming it moves ~/.config/kord and orphans the
-    # stored vault path — the user would be sent back through vault setup with
-    # an apparently empty library. The human-readable name belongs in the
-    # desktop entry and PULSE_PROP, both of which are set independently.
-    app.setApplicationName("kord")
+    app.setApplicationName("Kroma")
     app.setApplicationVersion(APP_VERSION)
     # Ties the window to packaging/kroma-player.desktop: sets the Wayland app_id
     # (matched by StartupWMClass) and lets Qt resolve the themed icon.
