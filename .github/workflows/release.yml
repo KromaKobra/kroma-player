@@ -175,7 +175,7 @@ jobs:
       VERSION: ${{ needs.guard.outputs.version }}
       # Pinned, so a new Inno Setup cannot change the installer between two
       # builds of the same commit. Bump it on purpose.
-      INNO_VERSION: '6.4.3'
+      INNO_VERSION: '6.7.1'
     steps:
       - uses: actions/checkout@v4
 
