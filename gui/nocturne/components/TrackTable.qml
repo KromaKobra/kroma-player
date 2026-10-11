@@ -27,6 +27,11 @@ Item {
     property string mode: "library"
     property var listVM: null
     property bool active: false
+    property bool gridMode: false
+    property bool gridAvailable: false
+    property int tileSize: 200
+    readonly property var songGrid: songGridLoader.item
+    readonly property int artworkSize: Math.min(42, Math.max(24, rowHeight - 12))
 
 
     property bool showIndex: false
@@ -134,16 +139,16 @@ Item {
     // And an album row, which only the "albums" search mode produces.
     signal albumActivated(int albumId)
 
-    // Reactive row count. listVM.rowCount() is a plain method call, so binding
-    // to it never updates; the internal ListView's count does.
-    property alias count: list.count
+    // Read the active presentation: Qt reports no ListView items while its
+    // delegate is disabled. Both counts notify without walking the model.
+    readonly property int count: gridMode && songGrid ? songGrid.count : list.count
 
     // ------------------------------------------------------------- geometry
 
     // The two fixed regions either side of the columns. Read by the header as
     // well as the rows, so they cannot disagree.
     readonly property int leadWidth: (showIndex ? Catalog.NUM_W + Theme.gap : 0)
-                                     + (showArt ? Catalog.ART_W + Theme.gap : 0)
+                                     + (showArt ? artworkSize + Theme.gap : 0)
     readonly property int trailWidth: Catalog.MORE_W + Theme.gap
 
     // What is left for the columns and the gaps between them. The gaps depend
@@ -164,7 +169,7 @@ Item {
     on_RawBudgetChanged: _pushBudget()
     onColumnLayoutChanged: _pushBudget()
 
-    readonly property int columnHeaderHeight: columnLayout && list.count > 0 ? 24 : 0
+    readonly property int columnHeaderHeight: !gridMode && columnLayout && list.count > 0 ? 24 : 0
 
     // The Library puts its whole overview in `listHeader`, and a column header
     // pinned above that would sit on top of a hero panel. There it rides the
@@ -838,6 +843,22 @@ Item {
         playRows([row], trackId > 0 ? [trackId] : [])
     }
 
+    function openTrackMenu(uid, trackId, row, title) {
+        deselectTimer.stop()
+        if (!selectedIds.has(uid))
+            handleClick(uid, false, false)
+        _menuUid = uid
+        _menuTrackId = trackId
+        _menuRow = row
+        _menuTitle = title
+        _menuTrackIds = selectedTrackIds()
+        _menuRows = selectedRows()
+        _menuActions = (typeof pluginsVM !== "undefined" && pluginsVM && listVM
+                        && _rowsForMenu().length <= 1)
+                       ? pluginsVM.actionsFor("track", listVM, uid) : []
+        rowMenu.popup()
+    }
+
     // Every menu item acts on the whole selection. Right-clicking outside the
     // selection collapses it to that row first (see openMenu), so the snapshot
     // is already the right answer in both cases; the fallbacks only cover a
@@ -895,16 +916,35 @@ Item {
     function _pushVisibleRange() {
         if (!listVM || typeof listVM.setVisibleRange !== "function")
             return
-        var n = list.count
+        var n = root.count
         if (n <= 0)
             return
         // Row 0 sits at content y 0 whether or not there is a header: a header
         // occupies negative content coordinates, which is what originY records.
         // So this arithmetic needs no adjusting for one.
-        var first = Math.max(0, Math.floor(list.contentY / rowHeight) - 4)
-        var last = Math.min(n - 1, Math.ceil((list.contentY + list.height) / rowHeight) + 4)
+        var view = gridMode ? songGrid : list
+        if (!view)
+            return
+        var stride = gridMode ? songGrid.cellHeight : rowHeight
+        var columns = gridMode ? songGrid.columns : 1
+        var first = Math.max(0, (Math.floor(view.contentY / stride) - 4) * columns)
+        var last = Math.min(n - 1, (Math.ceil((view.contentY + view.height) / stride) + 4) * columns)
         listVM.setVisibleRange(first, last)
     }
+
+    // Keep the first visible song in view when changing presentation. Only the
+    // current presentation creates delegates; selection stays on this owner.
+    onGridModeChanged: {
+        var row = gridMode ? Math.max(0, Math.floor(list.contentY / rowHeight))
+                           : songGrid ? Math.max(0, Math.floor(songGrid.contentY / songGrid.cellHeight) * songGrid.columns) : 0
+        Qt.callLater(function() {
+            var view = root.gridMode ? songGrid : list
+            if (view && view.count > 0)
+                view.positionViewAtIndex(Math.min(row, view.count - 1), GridView.Beginning)
+            root._pushVisibleRange()
+        })
+    }
+    onRowHeightChanged: _pushVisibleRange()
 
     Component.onCompleted: {
         _syncFromModel()
@@ -1051,11 +1091,7 @@ Item {
 
     // One corner mask for every row. Per-row masks leave a random handful of
     // rows with no artwork while scrolling — see CoverArt.qml.
-    CornerMask {
-        id: rowArtMask
-        width: 42; height: 42
-        radius: 7
-    }
+    readonly property var rowArtMask: list.artMask
 
     // The same, but round, for artist rows. A second mask rather than a
     // parameterised one because a mask is a rendered texture, not a value: the
@@ -1064,7 +1100,7 @@ Item {
     // problem back again.
     CornerMask {
         id: rowPortraitMask
-        width: 42; height: 42
+        width: root.artworkSize; height: root.artworkSize
         radius: 21
     }
 
@@ -1089,20 +1125,19 @@ Item {
         }
     }
 
-    ListView {
+    LibraryList {
         id: list
         // Named so a test can find the row list itself rather than one of the
         // menus, which are ListViews too.
         objectName: "trackList"
+        visible: !root.gridMode
         anchors.fill: parent
         // Docked mode reserves the header's height here instead; sticky mode
         // reserves it inside the header component above.
         anchors.topMargin: root._sticky ? 0 : root.columnHeaderHeight
-        // Roughly double Qt's defaults (2500 / 1500): a fast swipe or a hard
-        // notch should actually move fast, and still settle briskly rather
-        // than coasting indefinitely.
-        maximumFlickVelocity: 6000
-        flickDeceleration: 3000
+        rowHeight: root.rowHeight
+        artSize: root.artworkSize
+        artworkRadius: 7
 
         // The column header collapses when the last row goes — and `count`
         // reaches zero while that row is still on its way out, which would
@@ -1112,8 +1147,7 @@ Item {
         }
         model: root.listVM
         header: root._sticky ? _headerShell : null
-        clip: true
-        /* Rows are pooled rather than rebuilt.
+        /* Rows are pooled by LibraryList rather than rebuilt.
          *
          * This delegate is expensive — on the order of fifty QObjects, among
          * them a MultiEffect, which is an offscreen render pass of its own, and
@@ -1128,8 +1162,6 @@ Item {
          * bound, survives into whichever row next takes that object. The exit
          * transition above writes three such things. See `ListView.onReused`.
          */
-        reuseItems: true
-
         // Widened while a row is being dragged. The dragged row's *slot* stays
         // where it was in content coordinates while the edge auto-scroll runs,
         // so a long drag can carry it outside the ordinary buffer — and if the
@@ -1403,7 +1435,9 @@ Item {
             onClicked: root.clearSelection()
         }
 
-        delegate: Item {
+        delegate: root.gridMode ? null : trackRowDelegate
+
+        property Component trackRowDelegate: Item {
             id: rowItem
 
             required property int index
@@ -1743,27 +1777,8 @@ Item {
             }
 
             function openMenu() {
-                // Right-clicking the row you have selected must not then
-                // deselect it out from under the open menu: Remove from queue
-                // and Remove from playlist read the live backend selection
-                // rather than the snapshot taken here.
-                deselectTimer.stop()
-                if (!rowItem.selected)
-                    root.handleClick(rowItem.uid, false, false)
-                root._menuUid = rowItem.uid
-                root._menuTrackId = Number(rowItem.trackId) || -1
-                root._menuRow = rowItem.index
-                root._menuTitle = rowItem.titleText
-                root._menuTrackIds = root.selectedTrackIds()
-                root._menuRows = root.selectedRows()
-                // Asked now, for this row: what a plugin's action points at is
-                // one of the row's ids, which only the backend reads. One row
-                // only — there is nothing sensible to open for five.
-                root._menuActions =
-                    (typeof pluginsVM !== "undefined" && pluginsVM && root.listVM
-                     && root._rowsForMenu().length <= 1)
-                    ? pluginsVM.actionsFor("track", root.listVM, rowItem.uid) : []
-                rowMenu.popup()
+                root.openTrackMenu(rowItem.uid, Number(rowItem.trackId) || -1,
+                                   rowItem.index, rowItem.titleText)
             }
 
             /* The bed the row is pulled off, in the hole it left.
@@ -1993,7 +2008,7 @@ Item {
                         trackCount: Number(rowItem.model.albumTrackCount || 0)
                         isComplete: Boolean(rowItem.model.albumIsComplete)
                         // The square mask, the one every cover already shares.
-                        artMask: rowArtMask
+                        artMask: root.rowArtMask
                     }
                 }
 
@@ -2295,18 +2310,18 @@ Item {
                     // rather than leaving a hole where the sleeve was. The badge
                     // and the hover overlay are children of it and go too.
                     Item {
-                        width: root.showArt ? Catalog.ART_W : 0
+                        width: root.showArt ? root.artworkSize : 0
                         height: parent.height
                         visible: width > 0
 
                         CoverArt {
                             id: rowArt
                             anchors.centerIn: parent
-                            width: 42
-                            height: 42
+                            width: root.artworkSize
+                            height: width
                             radius: 7
                             tier: 128
-                            maskSource: rowArtMask
+                            maskSource: root.rowArtMask
                             hash: String(rowItem.coverHash || "")
                             url: String(rowItem.coverUrl || "")
                             placeholderText: rowItem.titleText
@@ -2569,9 +2584,22 @@ Item {
         }
     }
 
-    SmoothWheel {
-        id: smoothWheel
-        target: list
+    Loader {
+        id: songGridLoader
+        anchors.fill: parent
+        anchors.leftMargin: root.sideMargin
+        anchors.rightMargin: root.sideMargin
+        active: root.gridAvailable || root.gridMode
+        onLoaded: root._pushVisibleRange()
+        sourceComponent: LibraryGrid {
+            objectName: "songGridView"
+            labelHeight: 62
+            delegate: SongTile { table: root }
+            tileSize: root.tileSize
+            model: root.gridMode ? root.listVM : null
+            visible: root.gridMode
+            onViewportChanged: if (root.gridMode && root.songGrid) root._pushVisibleRange()
+        }
     }
 
     // ---------------------------------------------------------- column header
@@ -2591,7 +2619,7 @@ Item {
         trailWidth: root.trailWidth
         // Only paint a background once it is actually over the rows.
         pinned: root._sticky && root._headerY <= 0.5
-        onWheelDelta: root._sticky ? smoothWheel.handleWheel : null
+        onWheelDelta: root._sticky ? list.wheelHandler.handleWheel : null
     }
 
     // ------------------------------------------------------------ empty state
@@ -2616,7 +2644,8 @@ Item {
         // Nothing to say and nothing to draw: a caller that sets `emptyText` to
         // "" wants silence, and the glyph alone used to go on speaking. That is
         // how a `disc` sat in the middle of the import panel through every scan.
-        opacity: list.count === 0 && root.emptyText !== "" && !root.loading
+        objectName: "trackEmptyState"
+        opacity: root.count === 0 && root.emptyText !== "" && !root.loading
                  ? 1 : 0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: Theme.normal } }
@@ -2664,7 +2693,7 @@ Item {
         rowHeight: root.rowHeight
         sideMargin: root.sideMargin
         maxRows: root.loadingCount
-        active: root.loading && list.count === 0
+        active: root.loading && root.count === 0
     }
 
     // How many rows the work in flight is going to produce, when that is known.

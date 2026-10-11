@@ -22,31 +22,28 @@ Item {
     // page, exactly as it does for the artist one.
     signal openAlbumRequested(int albumId)
 
-    // Which face is showing. The page has three: the whole track list, every
-    // artist as a wall of portraits, and every album as a wall of sleeves. All
-    // three are "the collection, whole" — they answer "what do I have", "who do
-    // I have" and "which records do I have", and none of them is a search, so
-    // they belong on one page rather than three.
+    // Sidebar collection identity is independent of each display preference.
     readonly property bool artistsMode: Theme.prefs.libraryMode === 1
     readonly property bool albumsMode: Theme.prefs.libraryMode === 2
-    readonly property bool gridMode: artistsMode || albumsMode
+    // Collection identity is independent of its display layout.
+    readonly property bool collectionMode: artistsMode || albumsMode
 
     // Sidebar destinations can switch library faces while this page is active.
     Connections {
         target: Theme.prefs
         function onLibraryModeChanged() {
-            if (root.active && root.artistsMode)
-                artistsVM.refresh()
-            if (root.active && root.albumsMode)
-                albumsVM.refresh()
+            if (root.active && root.artistsMode && artistCollection)
+                artistCollection.refresh()
+            if (root.active && root.albumsMode && albumCollection)
+                albumCollection.refresh()
         }
     }
 
     onActiveChanged: if (active) {
-        if (artistsMode)
-            artistsVM.refresh()
-        if (albumsMode)
-            albumsVM.refresh()
+        if (artistsMode && artistCollection)
+            artistCollection.refresh()
+        if (albumsMode && albumCollection)
+            albumCollection.refresh()
     }
 
     // ---------------------------------------------------------------- tracks
@@ -75,13 +72,13 @@ Item {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: root.gridMode ? gridHeader.implicitHeight : songsHeader.implicitHeight
+        height: root.collectionMode ? gridHeader.implicitHeight : songsHeader.implicitHeight
 
         SongsHeader {
             id: songsHeader
             objectName: "songsHeader"
             anchors.fill: parent
-            visible: !root.gridMode
+            visible: !root.collectionMode
             songCount: libraryTracks.count
             totalDuration: libraryTracks.totalDuration
             onPlayRequested: playerVM.replace_queue_and_play(libraryTracks.trackIds())
@@ -95,7 +92,7 @@ Item {
         ViewHeader {
             id: gridHeader
             anchors.fill: parent
-            visible: root.gridMode
+            visible: root.collectionMode
             title: root.artistsMode ? "Artists" : "Albums"
             subtitle: root.artistsMode
                       ? Fmt.count(artistsVM.count, "artist")
@@ -104,11 +101,21 @@ Item {
                       : Fmt.count(albumsVM.count, "album")
                         + (albumsVM.needsAttentionCount > 0
                            ? " · " + albumsVM.needsAttentionCount + " need a look" : "")
+
+            ViewOptionsButton {
+                id: collectionOptions
+                objectName: "libraryCollectionOptionsButton"
+                anchors.verticalCenter: parent.verticalCenter
+                collectionName: root.artistsMode ? "Artist" : "Album"
+                onClicked: root.artistsMode ? artistCollection.openOptions(collectionOptions)
+                                            : albumCollection.openOptions(collectionOptions)
+            }
         }
     }
 
     TrackTable {
         id: libraryTable
+        objectName: "libraryTable"
         anchors.top: header.bottom
         anchors.left: parent.left
         anchors.right: parent.right
@@ -116,61 +123,81 @@ Item {
         sideMargin: Theme.gapXl
 
         mode: "library"
+        gridAvailable: true
+        gridMode: Theme.prefs.songGrid
+        tileSize: Theme.prefs.songTileSize
+        rowHeight: Theme.prefs.songCompact ? 40 : Theme.rowHeight
         listVM: libraryTracks
         showIndex: true
         // Not just about painting: TrackTable claims TrackSelection on becoming
         // active, so a table left active behind the grid would keep Escape,
         // Delete and the info panel bound to a list nobody can see.
-        active: root.active && !root.gridMode
+        active: root.active && !root.collectionMode
         columnLayout: root.columnLayouts ? root.columnLayouts.library : null
         emptyText: "Nothing here yet — import some files to get started"
         onGenerateBackingRequested: function (ids) { root.generateBackingRequested(ids) }
         onEditTrackRequested: function (id) { root.editTrackRequested(id) }
         onCopied: toast.show("Copied to clipboard", false)
 
-        opacity: root.gridMode ? 0 : 1
+        opacity: root.collectionMode ? 0 : 1
         visible: opacity > 0
-        Behavior on opacity { NumberAnimation { duration: Theme.normal } }
+        Behavior on opacity { NumberAnimation { duration: Theme.prefs.reducedMotion ? 0 : Theme.normal } }
     }
 
     // --------------------------------------------------------------- artists
 
-    // Cross-faded with the track list rather than swapped through a Loader: a
-    // Loader would destroy and rebuild the grid on every toggle, losing scroll
-    // position and re-creating delegates for a model that is already loaded
-    // whole. This page is never unloaded by the window either, so there is
-    // nothing for a Loader to save.
-    ArtistGrid {
-        id: artistGrid
-        objectName: "artistGrid"
+    // Collection pages remain alive across tab navigation to preserve scrolling.
+    // Their internal layout loader only changes when the presentation changes.
+    LibraryEntityView {
+        id: artistCollection
+        objectName: "artistCollection"
         anchors.top: header.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
 
-        onArtistActivated: function (id) { root.openArtistRequested(id) }
+        viewKey: "artist"
+        model: artistsVM
+        headingText: "ALL ARTISTS · " + artistsVM.count
+        roundArtwork: true
+        emptyIcon: "person"
+        emptyTitle: "No artists yet"
+        emptyDescription: "Import or download some music and everyone who made it turns up here."
+        delegate: ArtistDelegate {
+            onActivated: root.openArtistRequested(Number(artistId))
+        }
 
         opacity: root.artistsMode ? 1 : 0
         visible: opacity > 0
-        Behavior on opacity { NumberAnimation { duration: Theme.normal } }
+        Behavior on opacity { NumberAnimation { duration: Theme.prefs.reducedMotion ? 0 : Theme.normal } }
     }
 
     // ---------------------------------------------------------------- albums
 
     // Cross-faded like the artist wall, and for the same reasons.
-    AlbumGrid {
-        id: albumGrid
-        objectName: "albumGrid"
+    LibraryEntityView {
+        id: albumCollection
+        objectName: "albumCollection"
         anchors.top: header.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
 
-        onAlbumActivated: function (id) { root.openAlbumRequested(id) }
+        viewKey: "album"
+        model: albumsVM
+        headingText: "ALL ALBUMS · " + albumsVM.count
+                     + (albumsVM.needsAttentionCount > 0
+                        ? "  ·  " + albumsVM.needsAttentionCount + " need a look" : "")
+        emptyIcon: "disc"
+        emptyTitle: "No albums yet"
+        emptyDescription: "Import or download some music and the records it came from turn up here."
+        delegate: AlbumDelegate {
+            onActivated: root.openAlbumRequested(Number(albumId))
+        }
 
         opacity: root.albumsMode ? 1 : 0
         visible: opacity > 0
-        Behavior on opacity { NumberAnimation { duration: Theme.normal } }
+        Behavior on opacity { NumberAnimation { duration: Theme.prefs.reducedMotion ? 0 : Theme.normal } }
     }
 
     // --------------------------------------------------------------- dialogs
@@ -181,9 +208,11 @@ Item {
     ButtonGroup { id: sortFields }
     ButtonGroup { id: sortDirections }
 
-    NocturneMenu {
+    ViewOptionsMenu {
         id: sortMenu
         objectName: "songsSortMenu"
+        viewKey: "song"
+        viewportWidth: libraryTable.width - 2 * libraryTable.sideMargin
         transformOrigin: Item.TopRight
         enter: Transition {
             ParallelAnimation {

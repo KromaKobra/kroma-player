@@ -90,8 +90,8 @@ def _load(qt_app, backend):
 def test_the_artists_grid_renders_one_cell_per_artist(qt_app, backend):
     engine, root, warnings = _load(qt_app, backend)
 
-    grid = root.findChild(object, "artistGrid")
-    assert grid is not None, "LibraryView has no artistGrid"
+    grid = root.findChild(object, "artistCollection")
+    assert grid is not None, "LibraryView has no artistCollection"
 
     # Switch the page to its artists face, the way the Pill does.
     grid.setProperty("visible", True)
@@ -111,7 +111,7 @@ def test_changing_the_sort_reorders_the_grid(qt_app, backend):
     place."""
     engine, root, warnings = _load(qt_app, backend)
 
-    grid = root.findChild(object, "artistGrid")
+    grid = root.findChild(object, "artistCollection")
     grid.setProperty("visible", True)
     qt_app.processEvents()
 
@@ -144,18 +144,19 @@ def test_the_delegate_reads_no_role_artistsvm_does_not_serve(qt_app, backend):
     load, so it would otherwise ship as blank tiles nobody traced back here."""
     engine, root, warnings = _load(qt_app, backend)
 
-    grid = root.findChild(object, "artistGrid")
+    grid = root.findChild(object, "artistCollection")
     grid.setProperty("visible", True)
     qt_app.processEvents()
 
     fatal = [
         w.toString()
         for w in warnings
-        if "artistGrid" in w.toString().lower()
-        or "ArtistGrid" in w.toString()
+        if "ArtistDelegate" in w.toString()
+        or "LibraryCard" in w.toString()
+        or "LibraryEntityView" in w.toString()
         or "is not defined" in w.toString()
         or "Unable to assign" in w.toString()
     ]
-    assert not fatal, "ArtistGrid binding errors:\n" + "\n".join(fatal)
+    assert not fatal, "Artist collection binding errors:\n" + "\n".join(fatal)
 
     del engine

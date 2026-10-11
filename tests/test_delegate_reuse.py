@@ -65,7 +65,9 @@ def _properties_written_by_exit(source: str) -> set[str]:
 
 
 def test_rows_are_pooled():
-    assert re.search(r"reuseItems:\s*true", _source()), (
+    assert re.search(r"LibraryList\s*\{", _source())
+    source = (TRACK_TABLE.parent / "LibraryList.qml").read_text()
+    assert re.search(r"reuseItems:\s*true", source), (
         "TrackTable no longer pools its rows. If that was deliberate the rest of "
         "this module is obsolete; if it was not, a fast scroll is rebuilding the "
         "whole delegate per row again."

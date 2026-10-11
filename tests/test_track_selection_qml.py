@@ -4,6 +4,7 @@ from __future__ import annotations
 import pytest
 from PySide6.QtCore import Q_ARG, QMetaObject, QObject, Qt, QUrl, Slot
 from PySide6.QtQml import QQmlApplicationEngine, QQmlProperty
+from PySide6.QtTest import QTest
 
 from app.library.list_model import TrackListModel
 
@@ -93,6 +94,13 @@ Window {{
 
     def row(index):
         settle()
+        # Qt constructs buffered delegates over rendering frames; pumping the
+        # event queue alone can finish before the first buffer frame arrives.
+        for _ in range(50):
+            if any(item.property("rowIndex") == index
+                   for item in view.property("contentItem").childItems()):
+                break
+            QTest.qWait(20)
         return next(item for item in view.property("contentItem").childItems()
                     if item.property("rowIndex") == index)
 

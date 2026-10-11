@@ -38,6 +38,8 @@ kroma-showcase.html
 docs/*
 !docs/changelog/
 assets/gui-concept/*
+.codex/*
+.claude/*
 
 # Compiled GUI bundles. Build products of gui/<name>/, rebuilt automatically by
 # a checkout when the QML changes and by scripts/build-gui before packaging —

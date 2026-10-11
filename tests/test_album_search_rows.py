@@ -182,7 +182,7 @@ def _complete(backend, name):
 
 
 def test_the_album_wall_serves_the_role_its_delegate_requires(qt_app, backend):
-    """`AlbumGrid`'s cell declares `isComplete` as a **required** property.
+    """`AlbumDelegate` declares `isComplete` as a **required** property.
 
     A required property the model cannot answer is a delegate that is never
     built, so on a wall of sleeves the failure looks like a library that has
@@ -197,8 +197,8 @@ def test_the_album_wall_serves_the_role_its_delegate_requires(qt_app, backend):
     _complete(backend, "Horizon")
     engine, root, warnings = _load(qt_app, backend)
 
-    grid = root.findChild(object, "albumGrid")
-    assert grid is not None, "LibraryView has no albumGrid"
+    grid = root.findChild(object, "albumCollection")
+    assert grid is not None, "LibraryView has no albumCollection"
     grid.setProperty("visible", True)
     qt_app.processEvents()
 

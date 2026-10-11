@@ -30,7 +30,7 @@ from app.main import CONTEXT_PROPERTIES, _register_qml_types
 from app.models.track import Album, Artist, Track
 
 # The clamp both walls apply to whatever comes out of settings.json. Duplicated
-# from ArtistGrid/AlbumGrid rather than read out of them: a test that reads its
+# from LibraryEntityView rather than read out of them: a test that reads its
 # expectation from the thing under test cannot fail when that thing changes.
 MIN_TILE = 120
 MAX_TILE = 300
@@ -132,14 +132,14 @@ def test_the_wall_opens_at_the_stored_size(qt_app, backend):
 
     settings.setValue("artistTileSize", 130)
     engine, root, _ = _load(qt_app, backend)
-    grid = _wall(qt_app, root, "artistGridView")
+    grid = _wall(qt_app, root, "artistCollectionView")
     width = grid.property("width")
     dense = grid.property("columns")
     del engine
 
     settings.setValue("artistTileSize", 280)
     engine, root, _ = _load(qt_app, backend)
-    grid = _wall(qt_app, root, "artistGridView")
+    grid = _wall(qt_app, root, "artistCollectionView")
     sparse = grid.property("columns")
 
     assert width > 0, "the wall was never laid out, so its columns mean nothing"
@@ -159,8 +159,8 @@ def test_an_untouched_install_opens_where_it_always_did(qt_app, backend):
     stored, the targets are the numbers the grids used to hard-code."""
     engine, root, _ = _load(qt_app, backend)
 
-    artists = _wall(qt_app, root, "artistGrid")
-    albums = _wall(qt_app, root, "albumGrid")
+    artists = _wall(qt_app, root, "artistCollection")
+    albums = _wall(qt_app, root, "albumCollection")
 
     assert artists.property("tileSize") == ARTIST_DEFAULT
     assert albums.property("tileSize") == ALBUM_DEFAULT
@@ -180,7 +180,7 @@ def test_a_stop_moves_the_wall_and_is_remembered(qt_app, backend):
     the store as a width, because a column count would not survive a resize."""
     engine, root, _ = _load(qt_app, backend)
 
-    grid = _wall(qt_app, root, "artistGridView")
+    grid = _wall(qt_app, root, "artistCollectionView")
     slider = root.findChild(object, "artistTileSlider")
     assert slider is not None, "the artist heading has no tile slider"
     assert slider.property("available"), (
@@ -220,13 +220,13 @@ def test_a_garbage_stored_size_is_clamped(qt_app, backend):
 
     engine, root, _ = _load(qt_app, backend)
 
-    artists = _wall(qt_app, root, "artistGrid")
-    albums = _wall(qt_app, root, "albumGrid")
+    artists = _wall(qt_app, root, "artistCollection")
+    albums = _wall(qt_app, root, "albumCollection")
 
     assert artists.property("tileSize") == MAX_TILE
     assert albums.property("tileSize") == MIN_TILE
 
-    for name, target in (("artistGridView", MAX_TILE), ("albumGridView", MIN_TILE)):
+    for name, target in (("artistCollectionView", MAX_TILE), ("albumCollectionView", MIN_TILE)):
         grid = _wall(qt_app, root, name)
         assert grid.property("columns") == max(2, int(grid.property("width") // target))
         assert grid.property("cellWidth") > 0
@@ -243,8 +243,8 @@ def test_the_walls_load_with_no_binding_errors(qt_app, backend):
 
     engine, root, warnings = _load(qt_app, backend)
 
-    _wall(qt_app, root, "artistGrid")
-    _wall(qt_app, root, "albumGrid")
+    _wall(qt_app, root, "artistCollection")
+    _wall(qt_app, root, "albumCollection")
     slider = root.findChild(object, "artistTileSlider")
     _call(slider, "applyColumns", slider.property("columns") + 1)
     qt_app.processEvents()
@@ -253,8 +253,9 @@ def test_the_walls_load_with_no_binding_errors(qt_app, backend):
         w.toString()
         for w in warnings
         if "TileSizeSlider" in w.toString()
-        or "ArtistGrid" in w.toString()
-        or "AlbumGrid" in w.toString()
+        or "Library" in w.toString()
+        or "ArtistDelegate" in w.toString()
+        or "AlbumDelegate" in w.toString()
         or "is not defined" in w.toString()
         or "Unable to assign" in w.toString()
     ]

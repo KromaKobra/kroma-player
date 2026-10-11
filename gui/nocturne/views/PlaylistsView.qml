@@ -3,7 +3,7 @@ import QtQuick.Controls
 import Nocturne
 import "../components"
 
-// Playlists: a grid of covers that opens into a detail page with its own hero.
+// The playlist collection opens into a detail page with its own hero.
 Item {
     id: root
 
@@ -14,6 +14,9 @@ Item {
     signal generateBackingRequested(var trackIds)
     signal editTrackRequested(int trackId)
     property int openId: -1
+    readonly property bool listMode: !Theme.prefs.playlistGrid
+    readonly property bool compact: Theme.prefs.playlistCompact
+    readonly property int tileSize: Math.max(120, Math.min(300, Theme.prefs.playlistTileSize))
 
     // The cover travels with the click. playlistsVM exposes no row accessors,
     // and reading it back by Qt role number would hardcode a private detail.
@@ -48,7 +51,7 @@ Item {
         anchors.fill: parent
         visible: opacity > 0
         opacity: root.openId < 0 ? 1 : 0
-        Behavior on opacity { NumberAnimation { duration: Theme.normal } }
+        Behavior on opacity { NumberAnimation { duration: Theme.prefs.reducedMotion ? 0 : Theme.normal } }
 
         ViewHeader {
             id: gridHeader
@@ -65,9 +68,29 @@ Item {
                 variant: "filled"
                 onClicked: createDialog.openBlank()
             }
+            ViewOptionsButton {
+                id: optionsButton
+                objectName: "playlistViewOptionsButton"
+                anchors.verticalCenter: parent.verticalCenter
+                collectionName: "Playlist"
+                onClicked: viewOptions.openFor(optionsButton)
+            }
+        }
+        ViewOptionsMenu {
+            id: viewOptions
+            objectName: "playlistViewOptionsMenu"
+            viewKey: "playlist"
+            viewportWidth: grid.width
+            MenuRow {
+                text: "New playlist…"
+                iconName: "plus"
+                onTriggered: createDialog.openBlank()
+            }
+
         }
 
-        GridView {
+
+        LibraryCollectionView {
             id: grid
             anchors.top: gridHeader.bottom
             anchors.left: parent.left
@@ -76,190 +99,30 @@ Item {
             anchors.leftMargin: Theme.gapXl
             anchors.rightMargin: Theme.gapXl
             anchors.topMargin: Theme.gapSm
-            clip: true
             model: playlistsVM
-
-            readonly property int columns: Math.max(2, Math.floor(width / 200))
-            cellWidth: Math.floor(width / columns)
-            cellHeight: cellWidth + 54
-
-            // One corner mask for every cover in the grid. Every cell is the
-            // same size, so a mask each is pure waste — and per-cell mask
-            // layers leave random covers blank while scrolling (CoverArt.qml).
-            readonly property int artSize: Math.max(1, cellWidth - 30)
-            CornerMask {
-                id: gridArtMask
-                parent: grid
-                width: grid.artSize
-                height: grid.artSize
-                radius: Theme.radius
-            }
-
-            ScrollBar.vertical: ScrollBar { width: 7 }
-
-            delegate: Item {
-                id: cell
-                required property int index
-                required property var playlistId
-                required property var name
-                required property var coverHash
-                required property var trackCount
-                required property var totalDuration
-
-                width: grid.cellWidth
-                height: grid.cellHeight
-
-                Rectangle {
-                    anchors.fill: parent
-                    anchors.margins: 7
-                    radius: Theme.radiusLg
-                    color: cellMouse.containsMouse
-                           ? Theme.alpha(Theme.text, 0.06) : "transparent"
-                    Behavior on color { ColorAnimation { duration: Theme.fast } }
+            viewObjectName: "playlistCollectionView"
+            listMode: root.listMode
+            compact: root.compact
+            tileSize: root.tileSize
+            labelHeight: 54
+            delegate: PlaylistDelegate {
+                onActivated: root.open(Number(playlistId), coverHash)
+                onContextRequested: {
+                    root._armMenu(playlistId, name, coverHash, trackCount, false)
+                    cellMenu.popup()
                 }
-
-                Column {
-                    anchors.fill: parent
-                    anchors.margins: 15
-                    spacing: 11
-
-                    Item {
-                        width: parent.width
-                        height: width
-
-                        CoverArt {
-                            id: cellArt
-                            anchors.fill: parent
-                            radius: Theme.radius
-                            tier: 512
-                            maskSource: gridArtMask
-                            hash: String(cell.coverHash || "")
-                            placeholderText: String(cell.name || "")
-                            scale: cellMouse.containsMouse ? 1.03 : 1.0
-                            Behavior on scale {
-                                NumberAnimation { duration: Theme.normal; easing.type: Theme.easing }
-                            }
-                        }
-
-                        // Play button floats in on hover.
-                        Rectangle {
-                            width: 44
-                            height: 44
-                            radius: 22
-                            anchors.right: parent.right
-                            anchors.bottom: parent.bottom
-                            anchors.margins: 10
-                            gradient: Gradient {
-                                orientation: Gradient.Horizontal
-                                GradientStop { position: 0.0; color: Theme.accent }
-                                GradientStop { position: 1.0; color: Theme.accentAlt }
-                            }
-                            opacity: cellMouse.containsMouse ? 1 : 0
-                            scale: cellMouse.containsMouse ? 1 : 0.8
-                            visible: opacity > 0 && Number(cell.trackCount) > 0
-
-                            Behavior on opacity { NumberAnimation { duration: Theme.fast } }
-                            Behavior on scale {
-                                NumberAnimation { duration: Theme.normal; easing.type: Easing.OutBack }
-                            }
-
-                            Icon {
-                                anchors.centerIn: parent
-                                anchors.horizontalCenterOffset: 1
-                                name: "play"
-                                size: 17
-                                color: Theme.accentInk
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    playlistTracksVM.load(cell.playlistId)
-                                    playAfterLoad.playlistId = cell.playlistId
-                                    playAfterLoad.restart()
-                                }
-                            }
-                        }
-                    }
-
-                    Column {
-                        width: parent.width
-                        spacing: 3
-
-                        Text {
-                            width: parent.width
-                            text: String(cell.name || "")
-                            elide: Text.ElideRight
-                            color: Theme.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fzBody
-                            font.weight: Font.DemiBold
-                        }
-
-                        Text {
-                            width: parent.width
-                            text: Fmt.count(Number(cell.trackCount) || 0, "track")
-                                  + (Number(cell.totalDuration) > 0
-                                     ? " · " + Fmt.longDuration(cell.totalDuration) : "")
-                            elide: Text.ElideRight
-                            color: Theme.faint
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fzTiny
-                        }
-                    }
-                }
-
-                MouseArea {
-                    id: cellMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    acceptedButtons: Qt.LeftButton | Qt.RightButton
-                    cursorShape: Qt.PointingHandCursor
-                    z: -1
-                    onClicked: function (event) {
-                        if (event.button === Qt.RightButton) {
-                            root._armMenu(cell.playlistId, cell.name,
-                                          cell.coverHash, cell.trackCount, false)
-                            cellMenu.popup()
-                        } else {
-                            root.open(cell.playlistId, cell.coverHash)
-                        }
-                    }
+                onPlayRequested: {
+                    playlistTracksVM.load(playlistId)
+                    playAfterLoad.playlistId = playlistId
+                    playAfterLoad.restart()
                 }
             }
-
-            // Empty state
-            Column {
+            LibraryEmptyState {
                 anchors.centerIn: parent
-                spacing: Theme.gap
                 visible: grid.count === 0
-                width: 320
-
-                Icon {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    name: "playlist"
-                    size: 40
-                    color: Theme.alpha(Theme.text, 0.16)
-                }
-                Text {
-                    width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
-                    text: "No playlists yet"
-                    color: Theme.dim
-                    font.family: Theme.displayFamily
-                    font.pixelSize: Theme.fzMed
-                    font.weight: Font.DemiBold
-                }
-                Text {
-                    width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.WordWrap
-                    text: "Group tracks however you like — by mood, by set, by anything."
-                    color: Theme.faint
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fzSmall
-                }
+                iconName: "playlist"
+                title: "No playlists yet"
+                description: "Group tracks however you like — by mood, by set, by anything."
                 AppButton {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: "Create your first playlist"
@@ -270,7 +133,6 @@ Item {
             }
         }
 
-        SmoothWheel { target: grid }
     }
 
     // Loading a playlist is synchronous, but the model needs a tick to settle
@@ -350,7 +212,7 @@ Item {
         anchors.fill: parent
         visible: opacity > 0
         opacity: root.openId >= 0 ? 1 : 0
-        Behavior on opacity { NumberAnimation { duration: Theme.normal } }
+        Behavior on opacity { NumberAnimation { duration: Theme.prefs.reducedMotion ? 0 : Theme.normal } }
 
         // The same banner the artist and album pages wear — see DetailHero.
         DetailHero {

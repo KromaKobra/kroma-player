@@ -105,6 +105,31 @@ QtObject {
         property int albumTileSize: SettingsStore.value("albumTileSize", 200)
         onAlbumTileSizeChanged: if (root._ready) SettingsStore.setValue("albumTileSize", albumTileSize)
 
+        // Display preferences belong to each collection, independently of the
+        // sidebar destination and sort order. Preserve existing opening layouts.
+        property bool songGrid: SettingsStore.value("songGrid", false)
+        onSongGridChanged: if (root._ready) SettingsStore.setValue("songGrid", songGrid)
+        property bool artistGrid: SettingsStore.value("artistGrid", true)
+        onArtistGridChanged: if (root._ready) SettingsStore.setValue("artistGrid", artistGrid)
+        property bool albumGrid: SettingsStore.value("albumGrid", true)
+        onAlbumGridChanged: if (root._ready) SettingsStore.setValue("albumGrid", albumGrid)
+        property bool playlistGrid: SettingsStore.value("playlistGrid", true)
+        onPlaylistGridChanged: if (root._ready) SettingsStore.setValue("playlistGrid", playlistGrid)
+
+        property bool songCompact: SettingsStore.value("songCompact", false)
+        onSongCompactChanged: if (root._ready) SettingsStore.setValue("songCompact", songCompact)
+        property bool artistCompact: SettingsStore.value("artistCompact", false)
+        onArtistCompactChanged: if (root._ready) SettingsStore.setValue("artistCompact", artistCompact)
+        property bool albumCompact: SettingsStore.value("albumCompact", false)
+        onAlbumCompactChanged: if (root._ready) SettingsStore.setValue("albumCompact", albumCompact)
+        property bool playlistCompact: SettingsStore.value("playlistCompact", false)
+        onPlaylistCompactChanged: if (root._ready) SettingsStore.setValue("playlistCompact", playlistCompact)
+
+        property int songTileSize: SettingsStore.value("songTileSize", 200)
+        onSongTileSizeChanged: if (root._ready) SettingsStore.setValue("songTileSize", songTileSize)
+        property int playlistTileSize: SettingsStore.value("playlistTileSize", 200)
+        onPlaylistTileSizeChanged: if (root._ready) SettingsStore.setValue("playlistTileSize", playlistTileSize)
+
         // Whether the album page repeats the sleeve down its rows. Off by
         // default: the hero is already showing the cover at 152px, and an album
         // is the one list where every row would carry the same one. The row that

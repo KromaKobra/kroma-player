@@ -36,7 +36,6 @@ NOCTURNE = REPO_ROOT / "gui" / "nocturne"
 # every CoverArt one shared mask.
 LIST_VIEWS = [
     NOCTURNE / "components" / "TrackTable.qml",
-    NOCTURNE / "views" / "PlaylistsView.qml",
 ]
 
 
@@ -57,7 +56,7 @@ def _block_at(source: str, open_brace: int) -> tuple[int, int]:
 def delegate_spans(source: str) -> list[tuple[int, int]]:
     """Character spans of every `delegate: X { ... }` block."""
     spans = []
-    for match in re.finditer(r"delegate:\s*\w*\s*\{", source):
+    for match in re.finditer(r"(?:delegate:|property Component trackRowDelegate:)\s*\w*\s*\{", source):
         spans.append(_block_at(source, match.end() - 1))
     return spans
 
@@ -129,3 +128,20 @@ def test_cover_art_only_builds_a_private_mask_when_unshared():
     assert re.search(r"maskSource:\s*root\.maskSource !== null", source), (
         "CoverArt's MultiEffect must prefer the shared mask over the private one"
     )
+
+
+@pytest.mark.parametrize("name", ["LibraryCard.qml", "SongTile.qml"])
+def test_collection_delegates_consume_view_mask(name):
+    source = (NOCTURNE / "components" / name).read_text()
+    covers = [source[slice(*_block_at(source, match.end() - 1))]
+              for match in re.finditer(r"CoverArt\s*\{", source)]
+    assert covers
+    assert all(re.search(r"maskSource:.*view\.artMask", block) for block in covers)
+    assert not re.search(r"CornerMask\s*\{", source), "delegates must not allocate mask textures"
+
+
+@pytest.mark.parametrize("name", ["LibraryGrid.qml", "LibraryList.qml"])
+def test_shared_layouts_own_one_mask(name):
+    source = (NOCTURNE / "components" / name).read_text()
+    assert len(re.findall(r"CornerMask\s*\{", source)) == 1
+    assert "property alias artMask: sharedMask" in source

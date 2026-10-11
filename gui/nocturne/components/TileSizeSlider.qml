@@ -1,23 +1,9 @@
 import QtQuick
+import QtQuick.Controls
 import Nocturne
 
-// How many artists or albums fit across the wall. A slider flanked by the two
-// walls it chooses between — a dense 3x3 on the left, a roomy 2x2 on the right
-// — so the control says what it does without a label beside the sort button.
-//
-// Hand-rolled from a Rectangle groove and a MouseArea rather than a
-// QtQuick.Controls Slider, which this package uses nowhere: the visual grammar
-// here is VolumeControl's, down to the 4px groove that grows to 5 on hover and
-// the handle that only fades in once the pointer is over it.
-//
-// The one thing it does not share with a volume slider is its range. A grid
-// fills its row — `cellWidth = floor(width / columns)` — so the size a user
-// actually sees is quantised by the column count, and a slider walking a target
-// width in even pixel steps would sit dead for several steps in a row at the
-// large end (at 1200px, every target from 250 to 300 lays out four columns).
-// **So the stops are column counts and the value written back is a width.**
-// Every notch visibly changes the wall; the number that reaches settings.json
-// is `width / columns`, which still means the same thing after a resize.
+// Stops represent column counts, so every movement changes the visible grid.
+// Store the resulting target width so the preference survives window resizing.
 Row {
     id: root
 
@@ -31,9 +17,8 @@ Row {
     // until the wall has been laid out, and `available` is false until then.
     property real viewportWidth: 0
 
-    // Matches the grids' own `Math.max(2, ...)` floor: a wall one tile wide is
-    // a list, and a worse one than the track table.
-    property int minColumns: 2
+    // Allow one column in narrow windows, just like the collection grids.
+    property int minColumns: 1
     property int sliderWidth: 76
 
     signal sizeRequested(int tileSize)
@@ -72,13 +57,8 @@ Row {
     // reachable in one call rather than only through a drag.
     function applyColumns(cols) {
         var c = Math.max(_minCols, Math.min(_maxCols, Math.round(cols)))
-        var size = Math.round(viewportWidth / Math.max(1, c))
+        var size = Math.floor(viewportWidth / Math.max(1, c))
         root.sizeRequested(Math.round(Math.max(minimum, Math.min(maximum, size))))
-    }
-
-    function _applyFraction(f) {
-        var clamped = Math.max(0, Math.min(1, f))
-        applyColumns(_maxCols - clamped * _span)
     }
 
     // ---------------------------------------------------------------- shape
@@ -90,73 +70,49 @@ Row {
         color: Theme.faint
     }
 
-    Item {
+    Slider {
+        id: slider
+        objectName: "tileSizeControl"
         width: root.sliderWidth
         height: root.height
         anchors.verticalCenter: parent.verticalCenter
+        from: 0
+        // Keep a fixed range: a changing maximum can clamp the initial value
+        // before the viewport has finished laying out.
+        to: 1
+        stepSize: 1 / root._span
+        snapMode: Slider.SnapAlways
+        value: root._fraction
+        enabled: root.available
+        Accessible.name: "Tile size"
+        Accessible.description: Fmt.count(root.columns, "across", "across")
+        onMoved: root.applyColumns(root._maxCols - slider.value * root._span)
 
-        Rectangle {
-            id: groove
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            height: slideMouse.containsMouse || slideMouse.pressed ? 5 : 4
-            radius: height / 2
+        background: Rectangle {
+            x: slider.leftPadding
+            y: slider.topPadding + slider.availableHeight / 2 - height / 2
+            width: slider.availableWidth
+            height: 4
+            radius: 2
             color: Theme.alpha(Theme.text, 0.13)
-
-            Behavior on height { NumberAnimation { duration: Theme.fast } }
-
             Rectangle {
-                anchors.left: parent.left
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                width: parent.width * root._fraction
-                radius: height / 2
-                color: slideMouse.containsMouse || slideMouse.pressed
-                       ? Theme.accent : Theme.alpha(Theme.text, 0.62)
-                Behavior on color { ColorAnimation { duration: Theme.fast } }
+                width: slider.visualPosition * parent.width
+                height: parent.height
+                radius: 2
+                color: Theme.accent
             }
         }
-
-        Rectangle {
-            width: 11
-            height: 11
-            radius: 5.5
-            color: Theme.text
-            anchors.verticalCenter: groove.verticalCenter
-            x: groove.width * root._fraction - width / 2
-            opacity: slideMouse.containsMouse || slideMouse.pressed ? 1 : 0
-            Behavior on opacity { NumberAnimation { duration: Theme.fast } }
-            Behavior on x {
-                NumberAnimation { duration: Theme.fast; easing.type: Theme.easing }
-            }
+        handle: Rectangle {
+            x: slider.leftPadding + slider.visualPosition * (slider.availableWidth - width)
+            y: slider.topPadding + slider.availableHeight / 2 - height / 2
+            width: 12; height: 12; radius: 6
+            color: slider.pressed ? Theme.accent : Theme.text
+            border.width: slider.visualFocus ? 2 : 0
+            border.color: Theme.accent
+            opacity: slider.enabled ? 1 : 0.4
         }
-
-        MouseArea {
-            id: slideMouse
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            preventStealing: true
-
-            onPressed: function (e) { root._applyFraction(e.x / Math.max(1, groove.width)) }
-            onPositionChanged: function (e) {
-                if (pressed)
-                    root._applyFraction(e.x / Math.max(1, groove.width))
-            }
-            // One stop per notch rather than a fraction of the range: the whole
-            // point of this slider is that a step always does something.
-            onWheel: function (e) {
-                root.applyColumns(root.columns + (e.angleDelta.y > 0 ? -1 : 1))
-            }
-        }
-
-        // The number the stops actually mean, which the groove cannot show. In
-        // the same place as the sort chevron's tooltip beside it.
-        NocturneTooltip {
-            text: Fmt.count(root.columns, "across", "across")
-            visible: slideMouse.containsMouse || slideMouse.pressed
-        }
+        ToolTip.text: Fmt.count(root.columns, "across", "across")
+        ToolTip.visible: hovered || pressed
     }
 
     Icon {
