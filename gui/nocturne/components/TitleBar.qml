@@ -8,6 +8,8 @@ Item {
     id: root
     property var targetWindow: null
     property real sidebarWidth: 240
+    property Item sidebarToggleControl: null
+    readonly property bool sidebarHovered: sidebarHover.hovered
     property bool canGoBack: false
     property bool canGoForward: false
     property var historyEntries: []
@@ -50,20 +52,58 @@ Item {
         }
     }
 
-    Row {
-        x: 22
-        anchors.verticalCenter: parent.verticalCenter
-        spacing: 10
+    // Passive observation spans the sidebar's header without taking presses
+    // away from native dragging or the rail's floating collapse control.
+    Item {
+        width: root.sidebarWidth
+        height: root.height
+        HoverHandler { id: sidebarHover }
+    }
+
+    Item {
+        id: brand
+        width: root.sidebarWidth
+        height: parent.height
+        // Use the rail's displayed width so resizing and interrupted springs
+        // keep the logo in step with the sidebar icons and collapse control.
+        readonly property real collapseProgress: 1 - Math.max(0, Math.min(1,
+            (root.sidebarWidth - 100) / 100))
         Image {
+            id: appLogo
+            objectName: "appLogo"
+            // Keep the icon column's center fixed when the logo size changes.
+            x: 32 - width / 2
             anchors.verticalCenter: parent.verticalCenter
-            width: 20; height: 20
+            width: 26; height: 26
+            // Scale around the icon column's center without decoding a new
+            // texture on each frame or adding a second animation.
+            scale: (20 + 6 * brand.collapseProgress) / width
             source: "../assets/icon.png"
-            sourceSize: Qt.size(40, 40)
+            sourceSize: Qt.size(52, 52)
             fillMode: Image.PreserveAspectFit
             smooth: true
         }
         Text {
-            visible: root.sidebarWidth >= 180
+            objectName: "brandTitle"
+            x: appLogo.x + appLogo.width / 2 + appLogo.width * appLogo.scale / 2 + 10
+            opacity: 1 - brand.collapseProgress
+            visible: width > 0 && opacity > 0
+            // Reserve space only as the live control fades into this line.
+            // Follow its presentation values so hover reversals and sidebar
+            // resizing need no separate animation or delayed layout update.
+            readonly property real controlOverlap: root.sidebarToggleControl
+                ? Math.max(0, Math.min(y + height,
+                    root.sidebarToggleControl.y + root.sidebarToggleControl.height)
+                    - Math.max(y, root.sidebarToggleControl.y)) / Math.max(1, height)
+                : 0
+            readonly property real controlInset: root.sidebarToggleControl
+                ? root.sidebarToggleControl.opacity * controlOverlap
+                    * Math.max(0, root.sidebarWidth - 12
+                        - (root.sidebarToggleControl.x - 8))
+                : 0
+            width: Math.max(0, Math.min(implicitWidth,
+                root.sidebarWidth - 12 - x - controlInset))
+            elide: Text.ElideRight
             anchors.verticalCenter: parent.verticalCenter
             text: "Kroma Player"
             color: Theme.text

@@ -68,6 +68,17 @@ shared search field, and window controls. Blank space across the whole toolbar,
 including above either sidebar, moves the window through Qt's native system
 move API; double-clicking it toggles maximize. Controls consume their own input.
 Sidebar materials extend to the top edge and reuse the shared artwork blur.
+The expanded sidebar's collapse control sits at its header's right edge and
+fades in while the sidebar or its header is hovered. Keyboard focus also
+reveals it. The wordmark uses the available header width while the control is
+hidden, and progressively elides only where the fading control would overlap it.
+Collapsing the sidebar moves the same control into its own first
+row, where it remains visible; Ctrl+B toggles either presentation. Its vertical
+position and the space for that row follow the sidebar's displayed width during
+resizing, including threshold previews and reversals before the mouse is released.
+The app logo follows that same live width, growing from 20px to 26px around the
+icon column's center as the wordmark fades out. Its texture stays at a fixed
+resolution while the scene graph scales it.
 
 Navigation history remembers up to 60 destinations for the current session,
 including artist/album IDs, track editors, library sections, and search context.

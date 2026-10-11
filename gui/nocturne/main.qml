@@ -294,6 +294,7 @@ Window {
         z: 10
         targetWindow: mainWindow
         sidebarWidth: nav.width
+        sidebarToggleControl: nav.headerToggle
         canGoBack: navigationHistory.canGoBack
         canGoForward: navigationHistory.canGoForward
         historyEntries: navigationHistory.entries
@@ -368,6 +369,8 @@ Window {
         onNavigated: function (index) { mainWindow.go(index) }
         onLibraryNavigated: function (mode) { mainWindow.goLibrary(mode) }
         drawSurface: false
+        headerHost: titleBar
+        headerHovered: titleBar.sidebarHovered
     }
 
     // ------------------------------------------------------------------ views

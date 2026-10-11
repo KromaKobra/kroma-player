@@ -12,6 +12,10 @@ Item {
     property real maximumWidth: 360
     property bool reducedMotion: false
     property bool drawSurface: true
+    property Item headerHost: null
+    readonly property Item headerToggle: toggleButton
+    property bool headerHovered: false
+    readonly property bool hovered: sidebarHover.hovered
     property bool showEdit: false
     property bool showArtist: false
     property bool showAlbum: false
@@ -24,6 +28,9 @@ Item {
     readonly property real collapsedWidth: 64
     readonly property real collapseThreshold: 156
     readonly property real labelOpacity: Math.max(0, Math.min(1, (width - 100) / 100))
+    // Follow the same live geometry as the destination icons and labels,
+    // including held threshold previews, reversals, and cancelled gestures.
+    readonly property real toggleRowProgress: headerHost ? 1 - labelOpacity : 1
     readonly property bool resizing: resizeHandle.pressed
     readonly property real effectiveMaximum: resizeHandle.effectiveMaximum
     readonly property real targetWidth: resizeHandle.targetWidth
@@ -68,6 +75,7 @@ Item {
     implicitWidth: targetWidth
 
     SidebarSurface { anchors.fill: parent; visible: root.drawSurface }
+    HoverHandler { id: sidebarHover }
     Rectangle {
         visible: root.drawSurface
         anchors.right: parent.right
@@ -77,8 +85,22 @@ Item {
     Button {
         id: toggleButton
         objectName: "sidebarToggle"
-        x: 12; y: 8; width: 40; height: 36
-        Accessible.name: root.collapsed ? "Expand sidebar" : "Collapse sidebar"
+        // One control retains focus and identity in both presentations. Its
+        // visual parent is the toolbar, while this rail owns its behaviour.
+        parent: root.headerHost || root
+        x: root.headerHost ? Math.max(12, root.width - width - 12) : 12
+        readonly property real headerY: root.headerHost
+            ? (root.headerHost.height - height) / 2 : 8
+        y: !root.headerHost ? 8 : headerY
+            + (root.headerHost.height + 8 - headerY) * root.toggleRowProgress
+        width: 40; height: 36
+        focusPolicy: Qt.TabFocus
+        opacity: root.toggleRowProgress > 0 || root.resizing || root.hovered || root.headerHovered
+            || hovered || activeFocus ? 1 : 0
+        Behavior on opacity {
+            NumberAnimation { duration: root.reducedMotion ? 0 : Theme.fast }
+        }
+        Accessible.name: resizeHandle.previewCollapsed ? "Expand sidebar" : "Collapse sidebar"
         onClicked: root.toggle()
         background: Rectangle {
             radius: 8
@@ -94,15 +116,6 @@ Item {
             text: toggleButton.Accessible.name + " (Ctrl+B)"
             visible: toggleButton.hovered
         }
-    }
-    Text {
-        x: 60; y: 8; height: 36
-        width: Math.max(0, root.width - x - 12)
-        verticalAlignment: Text.AlignVCenter
-        text: "Navigation"
-        font.family: Theme.fontFamily; font.pixelSize: Theme.fzSmall
-        font.weight: Font.Medium; color: Theme.faint
-        opacity: root.labelOpacity; elide: Text.ElideRight
     }
     // Preserve wheel-to-destination navigation, with trackpad throttling.
     WheelSteps {
@@ -184,7 +197,8 @@ Item {
     }
     Flickable {
         id: scroll
-        anchors.top: toggleButton.bottom; anchors.topMargin: 8
+        anchors.top: parent.top
+        anchors.topMargin: 8 + 44 * root.toggleRowProgress
         anchors.bottom: footer.top; anchors.bottomMargin: 8
         width: parent.width; contentHeight: navigation.height
         clip: true; interactive: false; boundsBehavior: Flickable.StopAtBounds
