@@ -13,7 +13,7 @@ Rectangle {
     // Raised by the Edit button. The window owns navigation to the editor.
     signal editRequested(int trackId)
 
-    color: Theme.alpha(Theme.panelBg, 0.92)
+    color: Theme.panelBg
 
     Binding {
         target: typeof sidebarVM !== "undefined" ? sidebarVM : null
@@ -34,13 +34,18 @@ Rectangle {
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         width: 1
-        color: Theme.line
+        color: Theme.lineSoft
     }
 
     Flickable {
         id: flick
-        anchors.fill: parent
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
         anchors.leftMargin: 1
+        // Keep readable geometry during collapse. The outer panel clips and
+        // carries this surface to the right instead of crushing its contents.
+        width: Math.max(240, root.width - 1)
         contentHeight: content.implicitHeight + Theme.gapLg * 2
         clip: true
         boundsBehavior: Flickable.StopAtBounds

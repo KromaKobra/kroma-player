@@ -169,7 +169,7 @@ SettingsPane {
         ToggleSwitch {
             width: parent.width
             label: "Reduce sidebar motion"
-            description: "Change sidebar size immediately instead of animating."
+            description: "Change both sidebar sizes immediately instead of animating."
             checked: Theme.prefs.reducedMotion
             onToggled: function (value) { Theme.prefs.reducedMotion = value }
         }

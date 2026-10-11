@@ -41,7 +41,7 @@ Window {
     property real infoWidth: settingsVM.sessionValue("window.infoWidth", 320)
 
     readonly property real infoEffectiveWidth:
-        Math.max(240, Math.min(infoWidth, width - nav.width - 380))
+        infoResize.targetWidth
 
     // Where Back on a hidden page returns to. Never one of those pages itself.
     property int previousViewIndex: 0
@@ -569,38 +569,36 @@ Window {
 
     InfoPanel {
         id: infoPanel
+        objectName: "infoPanel"
         anchors.right: parent.right
         anchors.top: titleBar.bottom
         anchors.bottom: player.top
-        width: mainWindow.infoOpen ? mainWindow.infoEffectiveWidth : 0
+        width: infoResize.displayedWidth
         open: mainWindow.infoOpen
         clip: true
+        visible: width > 0
         onEditRequested: function (id) { mainWindow.editTrack(id) }
-
-        Behavior on width {
-            NumberAnimation { duration: Theme.normal; easing.type: Theme.easing }
-        }
     }
 
-    // Drag handle for the details panel.
-    MouseArea {
-        anchors.right: infoPanel.left
+    // Same direct manipulation and spring as the left sidebar, mirrored.
+    SidebarResizeHandle {
+        id: infoResize
+        objectName: "infoResizeHandle"
+        x: infoPanel.x - width / 2
         anchors.top: infoPanel.top
         anchors.bottom: infoPanel.bottom
-        width: 6
-        visible: mainWindow.infoOpen
-        cursorShape: Qt.SizeHorCursor
-        property real pressX: 0
-        property real startWidth: 0
-        onPressed: function (event) {
-            pressX = mapToItem(mainWindow.contentItem, event.x, 0).x
-            startWidth = mainWindow.infoWidth
-        }
-        onPositionChanged: function (event) {
-            if (!pressed)
-                return
-            var nowX = mapToItem(mainWindow.contentItem, event.x, 0).x
-            mainWindow.infoWidth = Math.max(240, Math.min(520, startWidth - (nowX - pressX)))
+        expandedWidth: mainWindow.infoWidth
+        collapsed: !mainWindow.infoOpen
+        collapsedWidth: 0
+        minimumExpandedWidth: 240
+        maximumWidth: Math.min(520, mainWindow.width - nav.width - 380)
+        collapseThreshold: 156
+        rightSidebar: true
+        reducedMotion: Theme.prefs.reducedMotion
+        visible: infoPanel.width > 0 || pressed
+        onResizeCommitted: function (preferredWidth, collapse) {
+            mainWindow.infoWidth = preferredWidth
+            mainWindow.infoOpen = !collapse
         }
     }
 

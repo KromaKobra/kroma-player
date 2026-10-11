@@ -24,9 +24,8 @@ Item {
     readonly property real collapseThreshold: 156
     readonly property real labelOpacity: Math.max(0, Math.min(1, (width - 100) / 100))
     readonly property bool resizing: resizeHandle.pressed
-    readonly property real effectiveMaximum: Math.max(minimumExpandedWidth, maximumWidth)
-    readonly property real targetWidth: collapsed ? collapsedWidth
-        : Math.max(minimumExpandedWidth, Math.min(expandedWidth, effectiveMaximum))
+    readonly property real effectiveMaximum: resizeHandle.effectiveMaximum
+    readonly property real targetWidth: resizeHandle.targetWidth
 
     signal navigated(int index)
     signal libraryNavigated(int mode)
@@ -63,51 +62,9 @@ Item {
     }
     function toggle() { collapsed = !collapsed }
 
-    // One analytic, critically damped spring for the whole sidebar. Retargeting
-    // preserves velocity and the displayed width; grabbing stops it immediately.
-    property real displayedWidth: 240
-    property real velocity: 0
-    property bool ready: false
+    readonly property real displayedWidth: resizeHandle.displayedWidth
     width: displayedWidth
     implicitWidth: targetWidth
-    Component.onCompleted: { displayedWidth = targetWidth; ready = true }
-    onTargetWidthChanged: {
-        if (!ready || resizing) return
-        if (reducedMotion) {
-            spring.running = false
-            displayedWidth = targetWidth
-            velocity = 0
-        } else spring.running = true
-    }
-    onReducedMotionChanged: if (reducedMotion && !resizing) {
-        spring.running = false
-        displayedWidth = targetWidth
-        velocity = 0
-    }
-    FrameAnimation {
-        id: spring
-        running: false
-        onTriggered: {
-            // Analytic integration is stable across variable refresh rates.
-            // 24 rad/s settles in about 0.35s without bounce or idle work.
-            var dt = Math.min(frameTime, 0.05)
-            var offset = root.displayedWidth - root.targetWidth
-            var c = root.velocity + 24 * offset
-            var decay = Math.exp(-24 * dt)
-            var nextWidth = root.targetWidth + (offset + c * dt) * decay
-            var boundedWidth = Math.max(root.collapsedWidth,
-                Math.min(Math.max(root.displayedWidth, root.effectiveMaximum), nextWidth))
-            root.velocity = boundedWidth === nextWidth
-                ? (root.velocity - 24 * c * dt) * decay : 0
-            root.displayedWidth = boundedWidth
-            if (Math.abs(root.displayedWidth - root.targetWidth) < 0.25
-                    && Math.abs(root.velocity) < 2) {
-                running = false
-                root.displayedWidth = root.targetWidth
-                root.velocity = 0
-            }
-        }
-    }
 
     Rectangle { anchors.fill: parent; color: Theme.panelBg }
     Rectangle {
@@ -255,51 +212,21 @@ Item {
         Rectangle { width: parent.width; height: 1; color: Theme.lineSoft }
         Destination { y: 10; entry: root.settingsItem }
     }
-    MouseArea {
+    SidebarResizeHandle {
         id: resizeHandle
         objectName: "sidebarResizeHandle"
-        x: root.width - width / 2; width: 8; height: parent.height
-        hoverEnabled: true; preventStealing: true; cursorShape: Qt.SizeHorCursor
-        property real pressX: 0
-        property real startWidth: 0
-        property real lastX: 0
-        property double lastTime: 0
-        property real releaseVelocity: 0
-        onPressed: function (event) {
-            spring.running = false
-            pressX = mapToItem(root.parent, event.x, 0).x
-            lastX = pressX; lastTime = Date.now()
-            startWidth = root.displayedWidth; releaseVelocity = 0
-        }
-        onPositionChanged: function (event) {
-            if (!pressed) return
-            var nowX = mapToItem(root.parent, event.x, 0).x
-            var now = Date.now()
-            if (now > lastTime) releaseVelocity = (nowX - lastX) * 1000 / (now - lastTime)
-            lastX = nowX; lastTime = now
-            root.displayedWidth = Math.max(root.collapsedWidth,
-                Math.min(root.effectiveMaximum, startWidth + nowX - pressX))
-        }
-        function finish(cancelled) {
-            if (!cancelled) {
-                var v = Date.now() - lastTime < 100 ? releaseVelocity : 0
-                // Short projection helps a deliberate left flick snap closed.
-                root.collapsed = root.displayedWidth < root.collapseThreshold
-                    || root.displayedWidth + Math.min(0, v) * 0.06 < root.collapseThreshold
-                if (!root.collapsed) root.expandedWidth = Math.max(root.minimumExpandedWidth,
-                    Math.min(root.displayedWidth, root.effectiveMaximum))
-                root.velocity = v
-            }
-            if (root.reducedMotion) {
-                root.displayedWidth = root.targetWidth; root.velocity = 0
-            } else spring.running = true
-        }
-        onReleased: finish(false)
-        onCanceled: finish(true)
-        Rectangle {
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: 2; height: parent.height; color: Theme.accent
-            opacity: resizeHandle.pressed ? 0.65 : resizeHandle.containsMouse ? 0.3 : 0
+        x: root.width - width / 2
+        height: parent.height
+        expandedWidth: root.expandedWidth
+        collapsed: root.collapsed
+        collapsedWidth: root.collapsedWidth
+        minimumExpandedWidth: root.minimumExpandedWidth
+        maximumWidth: root.maximumWidth
+        collapseThreshold: root.collapseThreshold
+        reducedMotion: root.reducedMotion
+        onResizeCommitted: function (preferredWidth, collapse) {
+            root.expandedWidth = preferredWidth
+            root.collapsed = collapse
         }
     }
 }

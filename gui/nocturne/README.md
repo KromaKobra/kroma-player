@@ -365,11 +365,22 @@ right edge to resize; releasing below 156px snaps to the icon rail. Expanding
 restores the previous expanded width. Width and collapsed state are saved with
 window session state.
 
-One frame-synchronized, critically damped spring drives the width and preserves
-velocity when retargeted. Resizing interrupts it at the displayed width and
-tracks the pointer directly; release hands motion back to the spring. Settings
-→ Appearance → Reduce sidebar motion makes size changes immediate. Navigation
-buttons support keyboard focus, accessible names and collapsed tooltips.
+Both sidebars use `SidebarResizeHandle` for the same frame-synchronized,
+critically damped spring and pointer handling. Retargeting preserves velocity;
+grabbing interrupts at the displayed width and tracks the pointer directly.
+Release hands velocity back to the spring, with a short momentum projection
+for collapsing flicks. The frame callback stops when settled.
+
+The right details panel expands to 240–520px within the available space. Drag
+its left edge right and release below 156px to close it completely. Its previous
+expanded width is retained; the transport's details toggle or **Ctrl+I** reopens
+it. Width and open state persist in window session state. Details keep a minimum
+content width while the outer panel clips them during collapse, avoiding cramped
+text and artwork. A closed panel has no active resize edge or metadata reads.
+
+Settings → Appearance → Reduce sidebar motion makes size changes immediate for
+both panels. Navigation buttons support keyboard focus, accessible names and
+collapsed tooltips.
 
 Scrolling the rail moves one slot at a time, and so does scrolling the settings
 tab strip — `WheelSteps` accumulates the deltas and reports whole steps, since a
