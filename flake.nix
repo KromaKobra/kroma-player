@@ -15,7 +15,7 @@
         # wheels against the store means PySide6 finds its Qt plugins and QML
         # modules without a wrapper; pip wheels would need nix-ld to run at all.
         pythonEnv = pkgs.python313.withPackages (ps: [
-          ps.pyside6      # requirements: >= 6.6
+          ps.pyside6      # requirements: >= 6.7
           ps.sqlalchemy   # >= 2.0
           ps.mutagen      # >= 1.47
           ps.pillow       # >= 12.2, with AVIF

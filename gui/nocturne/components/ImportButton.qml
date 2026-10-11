@@ -86,8 +86,7 @@ Item {
         //
         // Not two overlapping rounded rectangles, the usual trick: `soft` is a
         // translucent fill, and two of them would stack to a visibly darker
-        // band wherever they met. Not Qt 6.7's per-corner radii either —
-        // requirements.txt still admits PySide6 6.6, where they do not exist.
+        // band wherever they met.
         Item {
             id: primaryHalf
             anchors.left: parent.left

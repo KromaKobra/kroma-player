@@ -1,4 +1,4 @@
-PySide6>=6.6.0      # Qt for Python (GUI framework)
+PySide6>=6.7.0      # Qt for Python (native per-corner track selection radii)
 SQLAlchemy>=2.0     # Sqlite database management
 mutagen>=1.47       # Audio metadata editor (for database stashing)
 pillow>=12.2.0      # Image processing + AVIF encode/decode for album art (bundles libavif)

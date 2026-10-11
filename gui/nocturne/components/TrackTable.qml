@@ -62,6 +62,10 @@ Item {
     property Component listHeader: null
 
     property var selectedIds: new Set()
+    // uid -> selected (1), joined above (2), joined below (4). Built alongside
+    // the sidebar's existing selection walk, only on selection/order changes.
+    // Delegates read one cached value; scrolling makes no neighbour queries.
+    property var _selectionShapes: ({})
     property int selectionAnchor: -1
     // Snapshots taken at popup time, so a menu item acts on what was selected
     // when it opened rather than on whatever the list looks like by the time
@@ -661,6 +665,11 @@ Item {
         // no such signal.
         ignoreUnknownSignals: true
         function onSelectionChanged() { root._resyncSelection() }
+        function onModelReset() { root.reportSelection() }
+        function onRowsInserted() { root.reportSelection() }
+        function onRowsRemoved() { root.reportSelection() }
+        function onRowsMoved() { root.reportSelection() }
+        function onLayoutChanged() { root.reportSelection() }
     }
 
     function selectedTrackIds() {
@@ -693,9 +702,35 @@ Item {
     }
 
     function reportSelection() {
-        if (!active || !listVM || typeof sidebarVM === "undefined")
-            return
-        sidebarVM.setSelection(selectedTrackIds())
+        var shapes = ({})
+        var ids = []
+        var report = active && listVM && typeof sidebarVM !== "undefined"
+        if (listVM && selectedIds.size > 0) {
+            var previousRow = -2
+            var previousUid = -1
+            var n = listVM.rowCount()
+            for (var i = 0; i < n; i++) {
+                var uid = listVM.uidAt(i)
+                if (!selectedIds.has(uid))
+                    continue
+                var shape = 1
+                if (previousRow === i - 1) {
+                    shape |= 2
+                    shapes[previousUid] |= 4
+                }
+                shapes[uid] = shape
+                previousRow = i
+                previousUid = uid
+                if (report) {
+                    var tid = listVM.trackIdAt(i)
+                    if (tid !== undefined && tid !== null && tid > 0)
+                        ids.push(tid)
+                }
+            }
+        }
+        _selectionShapes = shapes
+        if (report)
+            sidebarVM.setSelection(ids)
     }
 
     function _rowOfUid(uid) {
@@ -770,7 +805,6 @@ Item {
             if (typeof listVM.setSelectedExclusive === "function")
                 listVM.setSelectedExclusive(uid)
         }
-        reportSelection()
     }
 
     function clearSelection() {
@@ -779,7 +813,6 @@ Item {
         selectionAnchor = -1
         if (listVM && typeof listVM.clearSelection === "function")
             listVM.clearSelection()
-        reportSelection()
     }
 
     // --------------------------------------------------------------- actions
@@ -1578,7 +1611,8 @@ Item {
                 Qt.callLater(_endSettle)
             }
 
-            readonly property bool selected: root.selectedIds.has(uid)
+            readonly property int selectionShape: root._selectionShapes[uid] || 0
+            readonly property bool selected: selectionShape !== 0
             // This row is one of the ones that just arrived — see `revealAdded`.
             readonly property bool justAdded: root._flashUids.has(uid)
             readonly property bool isPlaying: playerVM.has_current_track
@@ -1756,10 +1790,6 @@ Item {
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
                 anchors.leftMargin: root.sideMargin - 8
-                // Matching the backdrop's inset, so the two rectangles are the
-                // same shape and the card covers this one exactly.
-                anchors.topMargin: 1
-                anchors.bottomMargin: 1
                 width: Math.min(rowItem.cardShift, rowCard.width)
                 visible: width > 0.5 && opacity > 0
                 clip: true
@@ -1852,9 +1882,13 @@ Item {
 
                 Rectangle {
                     anchors.fill: parent
-                    anchors.topMargin: 1
-                    anchors.bottomMargin: 1
-                    radius: Theme.radius
+                    // Interior rows are plain rectangles, including Qt's
+                    // automatic antialiasing choice: no rounded geometry.
+                    radius: rowItem.selectionShape === 7 ? 0 : Theme.radius
+                    topLeftRadius: (rowItem.selectionShape & 2) ? 0 : radius
+                    topRightRadius: topLeftRadius
+                    bottomLeftRadius: (rowItem.selectionShape & 4) ? 0 : radius
+                    bottomRightRadius: bottomLeftRadius
                     // Selection still wins: a marked row has to be selectable,
                     // and a tint the selection could not overpower would make it
                     // impossible to see what is picked. Below that the amber sits
@@ -1865,13 +1899,12 @@ Item {
                            ? Theme.alpha(Theme.warning, rowHover.hovered ? 0.22 : 0.14)
                          : (rowHover.hovered ? Theme.alpha(Theme.text, 0.045)
                                              : "transparent")
-                    // Marked rows carry a hairline too. Against the ambient
+                    // Unselected marked rows carry a hairline. Against the ambient
                     // backdrop a low-alpha wash can wash out on a bright frame;
                     // an edge does not, and it is what makes the band read as a
                     // deliberate marking rather than a gradient artefact.
-                    border.width: rowItem.selected || rowItem.needsAttention ? 1 : 0
-                    border.color: rowItem.selected ? Theme.alpha(Theme.accent, 0.32)
-                                                   : Theme.alpha(Theme.warning, 0.38)
+                    border.width: !rowItem.selected && rowItem.needsAttention ? 1 : 0
+                    border.color: Theme.alpha(Theme.warning, 0.38)
 
                     Behavior on color {
                         enabled: !rowItem._settling
@@ -1885,15 +1918,16 @@ Item {
                 // this fades — a row selected before the import is still
                 // selected, and looks it, the moment the wash is gone.
                 //
-                // Deliberately without a hairline. A selected row is
-                // `accentSoft` *plus* an accent border; this is a bare wash at
-                // nearly three times the strength, which reads as a different
-                // thing — and it is gone inside two seconds either way.
+                // A bare wash at nearly three times the selection's strength,
+                // which reads as a different thing — and it is gone inside
+                // two seconds either way.
                 Rectangle {
                     anchors.fill: parent
-                    anchors.topMargin: 1
-                    anchors.bottomMargin: 1
-                    radius: Theme.radius
+                    radius: rowItem.selectionShape === 7 ? 0 : Theme.radius
+                    topLeftRadius: (rowItem.selectionShape & 2) ? 0 : radius
+                    topRightRadius: topLeftRadius
+                    bottomLeftRadius: (rowItem.selectionShape & 4) ? 0 : radius
+                    bottomRightRadius: bottomLeftRadius
                     color: Theme.alpha(Theme.accent, 0.28)
                     opacity: rowItem.justAdded ? root._flashLevel : 0
                     // Out of the scene graph when there is nothing to draw:
