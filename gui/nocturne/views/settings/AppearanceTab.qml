@@ -165,6 +165,14 @@ SettingsPane {
             checked: Theme.prefs.ambient
             onToggled: function (value) { Theme.prefs.ambient = value }
         }
+
+        ToggleSwitch {
+            width: parent.width
+            label: "Reduce sidebar motion"
+            description: "Change sidebar size immediately instead of animating."
+            checked: Theme.prefs.reducedMotion
+            onToggled: function (value) { Theme.prefs.reducedMotion = value }
+        }
     }
 
     Rectangle { width: parent.width; height: 1; color: Theme.line }

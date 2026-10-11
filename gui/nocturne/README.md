@@ -348,19 +348,28 @@ views/                One file per destination
   SettingsView          the tab bar and the six pages below
   settings/             AppearanceTab, PlaybackTab, BackingTab,
                         LibraryTab, SystemTab, AboutTab
-  BackingTrackView, TrackEditView, ImportView   the three hidden pages — below
+  BackingTrackView, TrackEditView, ImportView   work pages — below
 ```
 
-Three views have no permanent slot in the rail. `BackingTrackView` is reached by
-asking for an instrumental that does not exist yet, `TrackEditView` by choosing
-Edit on a single track, and `ImportView` by choosing a source in the Library
-header or pairing a web result with a file you already have. Each takes a rail
-slot only while it is relevant — the workbench while it still holds jobs, the
-editor while it holds unsaved changes, the import page while a scan is running
-or matches are still waiting to be dealt with. They sit in that order, editor
-uppermost, ordered by how long the job outlives your attention. `NavRail`
-therefore carries an explicit view index per slot rather than inferring one from
-position: with conditionally-present destinations the two stopped coinciding.
+`NavRail` follows the sidebar concept in `assets/gui-concept`: Home and listening
+destinations, a Library group with Songs, Albums, Artists and Playlists, Tools
+with Import, an empty Pinned heading, and Settings in the footer. Songs, Albums
+and Artists select the existing Library page's corresponding face. Home is a
+blank page. Open artist, album and track edit pages appear in an Open pages
+group while relevant. The backing workbench remains reachable through track
+actions; it has no sidebar button.
+
+The sidebar toggle and **Ctrl+B** switch between a 64px icon rail and the user's
+expanded width (200–360px, constrained by available content space). Drag the
+right edge to resize; releasing below 156px snaps to the icon rail. Expanding
+restores the previous expanded width. Width and collapsed state are saved with
+window session state.
+
+One frame-synchronized, critically damped spring drives the width and preserves
+velocity when retargeted. Resizing interrupts it at the displayed width and
+tracks the pointer directly; release hands motion back to the spring. Settings
+→ Appearance → Reduce sidebar motion makes size changes immediate. Navigation
+buttons support keyboard focus, accessible names and collapsed tooltips.
 
 Scrolling the rail moves one slot at a time, and so does scrolling the settings
 tab strip — `WheelSteps` accumulates the deltas and reports whole steps, since a
@@ -372,8 +381,8 @@ Import used to live inside the Library page, swapping that page's track list out
 from under it whenever a run was in flight. It is its own destination now, so
 neither feature has to make room for the other.
 
-Icons are generated at runtime from path data in `Icons.qml`, so the package
-contains no binary assets and every glyph inherits its colour from the theme.
+Icons are generated at runtime from path data in `Icons.qml`; sidebar paths are
+copied from the concept and every glyph inherits its colour from the theme.
 
 ## Import states
 

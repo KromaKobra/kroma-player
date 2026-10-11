@@ -14,12 +14,10 @@ if the wheel is swallowed on the way through — the bar simply does not answer.
 So the tests here post real ``QWheelEvent``s at the bar's actual window
 coordinates rather than calling into the handler.
 
-**The rail steps by slot, not by view index.** The two coincide only while no
-transient tab (Edit, Import, Backing) is up, and the transient tabs are exactly
-when a rail scroll is most likely to be used. ``+1`` on the view index would
-walk off Settings into a page the rail is not drawing; ``+1`` on the slot lands
-on the thing you can see below it. The isolated fixture below exists to force
-that case, which the real window will not produce without a dirty editor.
+**The rail steps by slot, not by view index.** Concept destinations are grouped,
+three entries select different faces of Library, and open pages come and go.
+``+1`` on the view index would skip visible destinations; stepping the slot
+lands on the next entry. The isolated fixture exercises an open editor.
 
 **A flick must not empty the rail.** One two-finger swipe delivers hundreds of
 pixels across dozens of events. Handed straight to a six-entry rail, every one
@@ -85,11 +83,9 @@ def gui(qt_app, tmp_path_factory):
 
 @pytest.fixture(scope="module")
 def transient_rail(qt_app):
-    """A rail of its own, with two transient slots showing.
+    """A rail of its own with an open editor after the permanent Import entry.
 
-    The real window only grows those slots for a dirty editor or a live import,
-    neither of which a test wants to arrange to ask a question about
-    arithmetic. NavRail imports nothing but Nocturne, so it stands up alone.
+    No dirty editor is needed to ask a question about slot arithmetic.
     """
     from PySide6.QtCore import QUrl
     from PySide6.QtQml import QQmlApplicationEngine
@@ -110,7 +106,7 @@ Window {
     visible: true
 
     // The owner, playing main.qml's part: the rail reports and this assigns.
-    property int index: 5
+        property int index: 3
     property int navigations: 0
 
     NavRail {
@@ -120,7 +116,6 @@ Window {
         anchors.bottom: parent.bottom
         currentIndex: probe.index
         showEdit: true
-        showImport: true
         onNavigated: function (i) {
             probe.index = i
             probe.navigations += 1
@@ -242,9 +237,9 @@ def test_the_rail_stops_at_its_ends(gui):
     rail = _item(window, "navRail")
     point = _centre(rail, y=100)
 
-    _go(window, qt_app, 0)
+    _go(window, qt_app, 13)
     _notch(window, qt_app, point, +1)
-    assert window.property("viewIndex") == 0, "scrolling up at the top wrapped"
+    assert window.property("viewIndex") == 13, "scrolling up at the top wrapped"
 
     _go(window, qt_app, 5)
     _notch(window, qt_app, point, -1)
@@ -284,28 +279,29 @@ def test_a_trackpad_flick_does_not_tear_through_the_rail(gui):
 def test_the_rail_steps_by_slot_not_by_view_index(transient_rail):
     """With a transient tab up, the next slot down is not the next view index.
 
-    Sitting on Settings (view 5, slot 5) with the editor and import slots
-    showing, one notch down is the editor — view 7. Stepping the view index
-    instead would ask for view 6, which is the backing workbench: a page with
-    no slot in this rail at all, and one the marker could not be drawn on.
+    From Playlists (view 3), the next entries are Import (8), an open editor
+    (7), then Settings (5). Incrementing view indices cannot produce that path.
     """
     window, qt_app = transient_rail
     rail = _item(window, "rail")
     point = _centre(rail, y=100)
 
-    assert window.property("index") == 5
+    assert window.property("index") == 3
 
     _notch(window, qt_app, point, -1)
-    assert window.property("index") == 7, (
+    assert window.property("index") == 8, (
         "the step walked the view index rather than the rail — with a "
         "transient slot up those are different numbers"
     )
 
     _notch(window, qt_app, point, -1)
-    assert window.property("index") == 8, "and on to the next slot down"
+    assert window.property("index") == 7, "and on to the open editor"
 
     _notch(window, qt_app, point, -1)
-    assert window.property("index") == 8, "which is the last slot; no wrap"
+    assert window.property("index") == 5, "Settings is the footer destination"
+
+    _notch(window, qt_app, point, -1)
+    assert window.property("index") == 5, "which is the last slot; no wrap"
 
     _notch(window, qt_app, point, +1)
     assert window.property("index") == 7, "back up the way it came"

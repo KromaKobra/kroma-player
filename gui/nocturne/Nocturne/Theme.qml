@@ -49,6 +49,9 @@ QtObject {
         property bool ambient: SettingsStore.value("ambient", true)
         onAmbientChanged: if (root._ready) SettingsStore.setValue("ambient", ambient)
 
+        property bool reducedMotion: SettingsStore.value("reducedMotion", false)
+        onReducedMotionChanged: if (root._ready) SettingsStore.setValue("reducedMotion", reducedMotion)
+
         // Library track list ordering. `librarySort` is a catalog field key —
         // see libraryVM.fields for which ones are sortable. Newest first by
         // default: what you just imported is what you are most likely looking

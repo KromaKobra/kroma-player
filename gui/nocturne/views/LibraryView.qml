@@ -52,10 +52,21 @@ Item {
     readonly property bool gridMode: artistsMode || albumsMode
 
     // Pushed once, not bound: Pill assigns to its own currentIndex on click and
-    // a binding into it would be destroyed by the first press. Nothing in the
-    // backend can change the mode behind the pill, so one-way is complete —
-    // unlike BrowseView's searchMode, which needs a Connections to stay in sync.
+    // a binding into it would be destroyed by the first press. Connections
+    // below pushes subsequent sidebar choices into the pill.
     Component.onCompleted: modePill.currentIndex = Theme.prefs.libraryMode
+
+    // Sidebar destinations can switch library faces while this page is active.
+    Connections {
+        target: Theme.prefs
+        function onLibraryModeChanged() {
+            modePill.currentIndex = Theme.prefs.libraryMode
+            if (root.active && root.artistsMode)
+                artistsVM.refresh()
+            if (root.active && root.albumsMode)
+                albumsVM.refresh()
+        }
+    }
 
     onActiveChanged: if (active) {
         databaseVM.refresh()
@@ -136,6 +147,7 @@ Item {
         // actions: it changes what the page *is*, where the others act on it.
         Pill {
             id: modePill
+            objectName: "libraryModePill"
             anchors.verticalCenter: parent.verticalCenter
             options: ["Tracks", "Artists", "Albums"]
             onSelected: function (index) { Theme.prefs.libraryMode = index }

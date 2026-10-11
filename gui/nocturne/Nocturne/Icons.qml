@@ -16,6 +16,19 @@ QtObject {
     ]
 
     readonly property var shapes: ({
+        // Sidebar geometry from assets/gui-concept/scripts/icons.js. Separate
+        // names preserve the established icon family elsewhere in the player.
+        "navHome": '<path d="M4 10.4 12 4l8 6.4V19a1.5 1.5 0 0 1-1.5 1.5H15v-5.25a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1V20.5H5.5A1.5 1.5 0 0 1 4 19Z"/>',
+        "navPlaying": '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.6"/>',
+        "navSong": '<path d="M9 18.2V6.4l10-2.2v11.6"/><circle cx="6.6" cy="18.2" r="2.4"/><circle cx="16.6" cy="15.8" r="2.4"/>',
+        "navAlbum": '<rect x="3.5" y="3.5" width="17" height="17" rx="3"/><circle cx="12" cy="12" r="4.2"/><circle cx="12" cy="12" r="0.6" fill="currentColor" stroke="none"/>',
+        "navArtist": '<circle cx="12" cy="8.2" r="3.9"/><path d="M4.6 20c.9-3.7 3.8-6 7.4-6s6.5 2.3 7.4 6"/>',
+        "navPlaylist": '<path d="M4 6h11M4 11h11M4 16h6.5"/><path d="M18.5 9.2v8.3"/><circle cx="16.4" cy="17.6" r="2.1"/><path d="m18.5 9.2 2.6.9"/>',
+        "navImport": '<path d="M12 3.8v10.4m-4.2-4.2 4.2 4.2 4.2-4.2"/><path d="M4 14.5v3a2.5 2.5 0 0 0 2.5 2.5h11a2.5 2.5 0 0 0 2.5-2.5v-3"/>',
+        "navSettings": '<path d="M4 7.5h8.5M16.5 7.5H20M4 16.5h3.5M11.5 16.5H20"/><circle cx="14.5" cy="7.5" r="2.1"/><circle cx="9.5" cy="16.5" r="2.1"/>',
+        "navSidebar": '<rect x="3.5" y="4.5" width="17" height="15" rx="2.6"/><path d="M9.6 4.5v15"/>',
+        "navQueue": '<path d="M4 6h16M4 11h16M4 16h8.5"/><path d="M15.6 14.2v6.2l5-3.1Z" fill="currentColor" stroke="none"/>',
+        "navSearch": '<circle cx="10.8" cy="10.8" r="6.3"/><path d="m15.6 15.6 4.4 4.4"/>',
         // ------------------------------------------------------- transport
         "play":  '<path d="M5.5,2.54A 1.95,1.95 0 0 0 4.52,2.8 1.95,1.95 0 0 0 3.54,4.49V 19.51a 1.95,1.95 0 0 0 2.93,1.69l 13.01,-7.51a 1.95,1.95 0 0 0 0,-3.38L 6.48,2.8A 1.95,1.95 0 0 0 5.5,2.54Z"/>',
         "pause": '<path d="m 6.755,3.28 c -0.74,0 -1.33,0.59 -1.33,1.32 v 14.8 c 0,0.73 0.59,1.32 1.33,1.32 h 1.01 c 0.73,0 1.32,-0.59 1.32,-1.32 V 4.6 c 0,-0.73 -0.59,-1.32 -1.32,-1.32 z m 9.48,0 c -0.73,0 -1.32,0.59 -1.32,1.32 v 14.8 c 0,0.73 0.59,1.32 1.32,1.32 h 1.02 c 0.73,0 1.32,-0.59 1.32,-1.32 V 4.6 c 0,-0.73 -0.59,-1.32 -1.32,-1.32 z"/>',
@@ -190,7 +203,7 @@ QtObject {
         var solid = filled.indexOf(name) >= 0
         var hex = _hex(color)
         var head = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
-                 + 'fill="' + (solid ? hex : "none") + '" '
+                 + 'color="' + hex + '" fill="' + (solid ? hex : "none") + '" '
                  + 'stroke="' + (solid ? "none" : hex) + '" '
                  + 'stroke-width="' + (strokeWidth > 0 ? strokeWidth : 1.7) + '" '
                  + 'stroke-linecap="round" stroke-linejoin="round">'

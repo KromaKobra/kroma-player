@@ -28,12 +28,11 @@ Window {
 
     // ------------------------------------------------------------------ state
 
-    // Indices 6 to 10 are the hidden pages — the backing-track workbench, the
-    // track editor, the import page, an artist, and the artist editor — which
-    // have no permanent rail slot. Clamped on restore to the last permanent view
-    // so a session that ended on one does not reopen on a page with nothing
-    // selected in the rail and nothing loaded to show.
-    property int viewIndex: Math.min(Theme.prefs.navIndex, 5)
+    // Restore the main collection destinations or Home (13). Editors and
+    // work pages need loaded entities or an import session, so do not reopen
+    // them from only a saved index.
+    property int viewIndex: Theme.prefs.navIndex === 13 ? 13
+        : Math.max(0, Math.min(Theme.prefs.navIndex, 5))
     // Restored from session.json alongside the geometry it belongs with. It
     // used to be stored twice — here and as a Theme pref — and only the Theme
     // copy was ever read back, so the two could disagree without anything
@@ -42,7 +41,7 @@ Window {
     property real infoWidth: settingsVM.sessionValue("window.infoWidth", 320)
 
     readonly property real infoEffectiveWidth:
-        Math.max(240, Math.min(infoWidth, width - Theme.navWidth - 380))
+        Math.max(240, Math.min(infoWidth, width - nav.width - 380))
 
     // Where Back on a hidden page returns to. Never one of those pages itself.
     property int previousViewIndex: 0
@@ -222,21 +221,17 @@ Window {
         anchors.top: titleBar.bottom
         anchors.bottom: player.top
         currentIndex: mainWindow.viewIndex
-        // Present while you are on the workbench, and for as long as it still
-        // holds jobs afterwards — so you can step away mid-batch and come back
-        // to it without going through the mic button again. Clearing the list
-        // is what makes it go away.
-        showBacking: mainWindow.viewIndex === 6 || backingVM.jobCount > 0
+        libraryMode: Theme.prefs.libraryMode
+        reducedMotion: Theme.prefs.reducedMotion
+        expandedWidth: settingsVM.sessionValue("window.sidebarWidth", 240)
+        collapsed: settingsVM.sessionValue("window.sidebarCollapsed", false)
+        maximumWidth: Math.min(360, mainWindow.width - 380
+            - (mainWindow.infoOpen ? 240 : 0))
         // The editor keeps its slot only while there is something to lose, so
         // you can go look at the track list mid-edit and find your way back.
         // A saved track is no longer being edited, and the slot goes with it.
         showEdit: mainWindow.viewIndex === 7 || editVM.isDirty
-        // Same bargain for the import page: present while you are on it, and
-        // afterwards for as long as there is a scan running or a list of
-        // matches still waiting to be dealt with. Clear empties that list,
-        // which is what takes the slot away.
-        showImport: mainWindow.viewIndex === 8 || importVM.hasResults
-                    || importVM.isAnalyzing || importVM.isSearching
+        // Import is now a permanent destination in the Tools group.
         // A slot from the moment you open an artist until Back on that page
         // closes it, plus the usual unsaved-work reprieve. Not "while you are
         // on one of the artist pages": stepping over to the Library is not
@@ -265,12 +260,17 @@ Window {
                    : (mainWindow.albumOpen || mainWindow.viewIndex === 11
                       ? 11 : 12)
         onNavigated: function (index) { mainWindow.go(index) }
+        onLibraryNavigated: function (mode) {
+            Theme.prefs.libraryMode = mode
+            mainWindow.go(4)
+        }
     }
 
     // ------------------------------------------------------------------ views
 
     FocusScope {
         id: content
+        objectName: "contentArea"
         anchors.left: nav.right
         anchors.right: infoPanel.left
         anchors.top: titleBar.bottom
@@ -282,6 +282,12 @@ Window {
         Item {
             id: stack
             anchors.fill: parent
+
+            Item {
+                objectName: "homeView"
+                anchors.fill: parent
+                visible: mainWindow.viewIndex === 13
+            }
 
             NowPlayingView {
                 anchors.fill: parent
@@ -377,8 +383,8 @@ Window {
                 onDone: mainWindow.go(mainWindow.previousViewIndex)
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
             }
-            // Not in the rail either. You get here by choosing a source in the
-            // Library header, or by pairing a web result with a local file.
+            // The Tools destination also opens when a source is chosen in the
+            // Library header, or a web result is paired with a local file.
             ImportView {
                 id: importPage
                 anchors.fill: parent
@@ -616,6 +622,11 @@ Window {
     // ------------------------------------------------------------- shortcuts
 
     Shortcut {
+        sequence: "Ctrl+B"
+        onActivated: nav.toggle()
+    }
+
+    Shortcut {
         sequence: "Ctrl+F"
         onActivated: mainWindow.go(2)
     }
@@ -802,6 +813,8 @@ Window {
         }
         settingsVM.setSessionValue("window.infoOpen", infoOpen)
         settingsVM.setSessionValue("window.infoWidth", Math.round(infoWidth))
+        settingsVM.setSessionValue("window.sidebarWidth", Math.round(nav.expandedWidth))
+        settingsVM.setSessionValue("window.sidebarCollapsed", nav.collapsed)
         settingsVM.sync()
     }
 }
