@@ -270,6 +270,7 @@ Item {
 
         mode: "library"
         listVM: libraryTracks
+        showIndex: true
         listHeader: overview
         // Not just about painting: TrackTable claims TrackSelection on becoming
         // active, so a table left active behind the grid would keep Escape,
