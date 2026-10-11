@@ -1,205 +1,166 @@
 import QtQuick
+import QtQuick.Controls
 import Nocturne
 import "../../components"
 
-// What the interface looks like, down to which interface it is.
 SettingsPane {
     id: pane
+    title: "Appearance"
+    description: "Your colours, your atmosphere, your interface."
+    onActiveChanged: if (active && typeof guiVM !== "undefined") guiVM.refresh()
 
-    onActiveChanged: {
-        if (!active)
-            return
-        if (typeof guiVM !== "undefined")
-            guiVM.refresh()
-        syncThemePill()
-    }
-
-    // The control owns its index, so the preference is pushed into it rather
-    // than bound to it — a binding would be discarded by the first click and
-    // the pill would go on showing something nothing agreed to.
-    function syncThemePill() {
-        themePill.currentIndex = Math.max(
-            0, Theme.modeKeys.indexOf(Theme.prefs.themeMode))
-    }
-
-    // ================================================== appearance
-    Column {
+    SettingsGroup {
         width: parent.width
-        spacing: Theme.gap
-
-        SectionLabel { text: "APPEARANCE" }
-
-        Item {
+        title: "Theme"
+        description: "Choose a look, or follow your desktop’s light and dark schedule."
+        keywords: "system dark light mode"
+        Row {
             width: parent.width
-            height: Math.max(themeLabel.implicitHeight, themePill.height)
-
-            Column {
-                id: themeLabel
-                anchors.left: parent.left
-                anchors.right: themePill.left
-                anchors.rightMargin: Theme.gap
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 2
-
-                Text {
-                    text: "Theme"
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fzBody
-                }
-                Text {
-                    width: parent.width
-                    wrapMode: Text.WordWrap
-                    text: "System follows the desktop, and keeps following it "
-                        + "while Kroma Player is open."
-                    color: Theme.faint
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fzTiny
-                }
-            }
-
-            Pill {
-                id: themePill
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                options: Theme.modeLabels
-                onSelected: function (index) {
-                    Theme.setMode(Theme.modeKeys[index])
-                }
-                Component.onCompleted: pane.syncThemePill()
-            }
-        }
-
-        Text {
-            width: parent.width
-            wrapMode: Text.WordWrap
-            text: Theme.prefs.followArtwork
-                ? "Pick the fallback colour for tracks without artwork."
-                : "Kroma means colour. Pick the one this interface runs on."
-            color: Theme.dim
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fzSmall
-        }
-
-        Flow {
-            width: parent.width
-            spacing: Theme.gap
-
+            spacing: 10
             Repeater {
-                model: Theme.accentKeys
-
-                delegate: Item {
-                    id: swatch
-                    required property var modelData
-
-                    readonly property var preset: Theme.accentTable[modelData]
-                    readonly property bool selected: Theme.prefs.accent === modelData
-
-                    width: 104
-                    height: 76
-
-                    Rectangle {
-                        anchors.fill: parent
+                model: Theme.modeKeys
+                delegate: Button {
+                    id: themeCard
+                    required property int index
+                    required property string modelData
+                    width: (parent.width - 20) / 3
+                    height: 122
+                    Accessible.name: Theme.modeLabels[index] + " theme"
+                    Accessible.role: Accessible.RadioButton
+                    Accessible.checked: Theme.prefs.themeMode === modelData
+                    onClicked: Theme.setMode(modelData)
+                    background: Rectangle {
                         radius: Theme.radius
-                        color: swatch.selected ? Theme.alpha(Theme.text, 0.07)
-                             : (swatchMouse.containsMouse
-                                ? Theme.alpha(Theme.text, 0.04) : "transparent")
-                        border.width: swatch.selected ? 1 : 1
-                        border.color: swatch.selected
-                                      ? Theme.alpha(Theme.accent, 0.55) : Theme.line
-                        Behavior on color { ColorAnimation { duration: Theme.fast } }
+                        color: Theme.prefs.themeMode === themeCard.modelData ? Theme.accentSoft : "transparent"
+                        border.color: themeCard.visualFocus || Theme.prefs.themeMode === themeCard.modelData ? Theme.accent : Theme.line
+                        border.width: 2
                     }
-
-                    Column {
-                        anchors.centerIn: parent
-                        spacing: 9
-
+                    contentItem: Item {
                         Rectangle {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            width: 62
-                            height: 22
-                            radius: 11
-                            // The pair for the mode that is on, so a swatch
-                            // previews what picking it would actually paint.
-                            gradient: Gradient {
-                                orientation: Gradient.Horizontal
-                                GradientStop {
-                                    position: 0.0
-                                    color: Theme.accentOf(swatch.modelData)
-                                }
-                                GradientStop {
-                                    position: 1.0
-                                    color: Theme.accentAltOf(swatch.modelData)
-                                }
+                            x: 4; y: 4
+                            width: parent.width - 8; height: 72
+                            radius: 6
+                            color: themeCard.modelData === "light" ? "#edeef3" : "#171923"
+                            Rectangle {
+                                anchors.right: parent.right
+                                width: parent.width / 2; height: parent.height
+                                radius: 6
+                                visible: themeCard.modelData === "system"
+                                color: "#edeef3"
                             }
-                            scale: swatchMouse.containsMouse ? 1.06 : 1.0
-                            Behavior on scale {
-                                NumberAnimation { duration: Theme.fast
-                                                  easing.type: Theme.easing }
+                            Rectangle { x: 8; y: 10; width: parent.width * 0.23; height: 4; radius: 2; color: Theme.accent }
+                            Rectangle { x: 8; y: 21; width: parent.width * 0.23; height: 3; radius: 1; color: "#727889" }
+                            Rectangle {
+                                x: parent.width * 0.38; y: 10
+                                width: parent.width * 0.54; height: 50; radius: 5
+                                gradient: Gradient {
+                                    GradientStop { position: 0; color: Theme.accent }
+                                    GradientStop { position: 1; color: Theme.accentAlt }
+                                }
                             }
                         }
-
                         Text {
                             anchors.horizontalCenter: parent.horizontalCenter
-                            text: swatch.preset.label
-                            color: swatch.selected ? Theme.text : Theme.faint
+                            y: 87
+                            text: (Theme.prefs.themeMode === themeCard.modelData ? "✓  " : "") + Theme.modeLabels[themeCard.index]
+                            color: Theme.text
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fzSmall
-                            font.weight: swatch.selected ? Font.DemiBold : Font.Normal
+                            font.weight: Font.DemiBold
                         }
-                    }
-
-                    MouseArea {
-                        id: swatchMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: Theme.setAccent(swatch.modelData)
                     }
                 }
             }
         }
-
+    }
+    SettingsGroup {
+        width: parent.width
+        title: "Colour & atmosphere"
         ToggleSwitch {
             width: parent.width
             label: "Follow the artwork"
-            description: "Use the playing track's cover colour for accents. Falls back to your selected colour when artwork is unavailable."
+            description: "Match accents to the playing track’s cover. Your chosen colour is used when artwork is unavailable."
             checked: Theme.prefs.followArtwork
-            onToggled: function (value) { Theme.prefs.followArtwork = value }
+            onToggled: function(value) { Theme.prefs.followArtwork = value }
         }
-
+        SettingRow {
+            width: parent.width
+            label: Theme.prefs.followArtwork ? "Fallback colour" : "Accent colour"
+            description: "Choose the colour used for buttons, selections and highlights."
+            keywords: "color accent aurora ember bloom verdant ice gold"
+            stacked: true
+            Flow {
+                width: parent.width
+                spacing: 10
+                Repeater {
+                    model: Theme.accentKeys
+                    delegate: Button {
+                        id: swatch
+                        required property string modelData
+                        width: 66; height: 66
+                        Accessible.name: Theme.accentTable[modelData].label
+                        Accessible.role: Accessible.RadioButton
+                        Accessible.checked: Theme.prefs.accent === modelData
+                        onClicked: Theme.setAccent(modelData)
+                        background: Rectangle {
+                            radius: Theme.radius
+                            color: swatch.down ? Theme.raised : "transparent"
+                            border.color: swatch.visualFocus || Theme.prefs.accent === swatch.modelData ? Theme.accent : "transparent"
+                        }
+                        contentItem: Column {
+                            spacing: 6
+                            Rectangle {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                width: 32; height: 32; radius: 16
+                                gradient: Gradient {
+                                    orientation: Gradient.Horizontal
+                                    GradientStop { position: 0; color: Theme.accentOf(swatch.modelData) }
+                                    GradientStop { position: 1; color: Theme.accentAltOf(swatch.modelData) }
+                                }
+                                Text { anchors.centerIn: parent; text: Theme.prefs.accent === swatch.modelData ? "✓" : ""; color: Theme.accentInk }
+                            }
+                            Text { anchors.horizontalCenter: parent.horizontalCenter; text: Theme.accentTable[swatch.modelData].label; color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fzTiny }
+                        }
+                    }
+                }
+            }
+        }
         ToggleSwitch {
             width: parent.width
             label: "Ambient artwork"
-            description: "Tint the window with a blurred wash of the playing track's cover."
+            description: "Add a soft wash of the playing track’s cover behind the interface."
             checked: Theme.prefs.ambient
-            onToggled: function (value) { Theme.prefs.ambient = value }
+            onToggled: function(value) { Theme.prefs.ambient = value }
         }
-
+    }
+    SettingsGroup {
+        width: parent.width
+        title: "Motion"
         ToggleSwitch {
             width: parent.width
-            label: "Reduce sidebar motion"
-            description: "Change both sidebar sizes immediately instead of animating."
+            label: "Reduce motion"
+            description: "Switch settings pages and resize sidebars immediately, with less control animation."
             checked: Theme.prefs.reducedMotion
-            onToggled: function (value) { Theme.prefs.reducedMotion = value }
+            onToggled: function(value) { Theme.prefs.reducedMotion = value }
         }
     }
 
-    Rectangle { width: parent.width; height: 1; color: Theme.line }
-
     // ================================================= gui switching
-    Column {
+    SettingsGroup {
+        title: "Interface package"
+        keywords: "GUI skin restart version"
         width: parent.width
         spacing: Theme.gap
         visible: typeof guiVM !== "undefined"
+        searchAvailable: typeof guiVM !== "undefined"
 
-        SectionLabel { text: "INTERFACE" }
+
 
         Text {
             width: parent.width
             wrapMode: Text.WordWrap
-            text: "Kroma Player loads its interface from a folder. Drop another one in "
-                + "and pick it here — changes take effect on the next launch."
+            text: "Choose an installed interface package. "
+                + "Your selection takes effect on the next launch."
             color: Theme.dim
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fzSmall

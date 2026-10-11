@@ -49,13 +49,12 @@ Requires GUI API version 13 (Kroma Player with `docs/GUI_API.md`).
 - **Playlists** — a cover grid that opens into a detail page with its own hero.
 - **Library** — what is stored and how much space it takes. The import buttons
   live in its header, but the run itself happens on a page of its own.
-- **Settings** — seven tabs across the top: *Appearance* (dark, light or
-  system, six accent themes, the ambient toggle, and the interface switcher),
-  *Playback*, *Backing*, *Library* (the vault and import), *Plugins* (install,
-  turn on — agreeing to a plugin's terms first — settings, and which plugin is
-  asked first), *System* (updates, and the programs Kroma and its plugins need)
-  and *About*. Switching one glides the page sideways, toward the side the tab
-  you picked lives on.
+- **Settings** — searchable categories for Appearance, Playback, Backing,
+  Library, Plugins, System and About. Search names, explanations or synonyms
+  to jump to a highlighted setting. Categories sit beside the content on wide
+  windows and above it on compact windows. Grouped cards use reusable switches,
+  choices, numeric editors, sliders, text fields and path controls. See the
+  [settings component guide](components/README.md) to add more.
 
 Multi-select works throughout with click, Ctrl-click, and Shift-click; the
 right-click menu acts on the whole selection.

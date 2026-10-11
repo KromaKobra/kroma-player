@@ -42,7 +42,47 @@ Item {
     // as a flinch rather than a movement — and the direction, which is the only
     // thing the gesture has to say, is lost in the blur. A hint of offset under
     // a cross-fade is what the eye actually reads it from. One page margin.
-    property real slide: Theme.gapXl
+    property real slide: Theme.prefs.reducedMotion ? 0 : 12
+    property string title: ""
+    property string description: ""
+
+    function searchEntries() {
+        var entries = []
+        function walk(item, trail) {
+            if (item.searchAvailable === false) return
+            if (item.settingsSearchText !== undefined && item.label) {
+                var key = trail.concat([item.label]).join(" › ")
+                entries.push({ label: item.label, description: item.description || "",
+                               key: key, context: trail.join(" › "),
+                               search: key + " " + item.settingsSearchText,
+                               target: item, pane: root, tab: root.index })
+                trail = trail.concat([item.label])
+            }
+            var children = item.children || []
+            for (var i = 0; i < children.length; ++i) walk(children[i], trail)
+        }
+        walk(column, [])
+        return entries
+    }
+
+    property var highlightedItem: null
+    function reveal(item) {
+        if (highlightedItem) highlightedItem.highlighted = false
+        highlightedItem = item
+        item.highlighted = true
+        flick.contentY = Math.max(0, Math.min(item.mapToItem(column, 0, 0).y - 16,
+                                             flick.contentHeight - flick.height))
+        if (item.focusEditor) item.focusEditor()
+        highlightTimer.restart()
+    }
+    Timer {
+        id: highlightTimer
+        interval: 2400
+        onTriggered: {
+            if (root.highlightedItem) root.highlightedItem.highlighted = false
+            root.highlightedItem = null
+        }
+    }
 
     x: current ? 0 : (index < currentIndex ? -slide : slide)
     opacity: current ? 1 : 0
@@ -53,7 +93,7 @@ Item {
     // leaving accelerates, the rule the rest of the package follows.
     Behavior on x {
         NumberAnimation {
-            duration: Theme.normal
+            duration: Theme.prefs.reducedMotion ? 0 : Theme.normal
             easing.type: root.current ? Theme.easing : Easing.InCubic
         }
     }
@@ -65,13 +105,13 @@ Item {
     // or given different durations per direction, that is exactly what happens.
     // Quicker than the travel, so the arriving page is solid well before it
     // finishes moving.
-    Behavior on opacity { NumberAnimation { duration: Theme.fast } }
+    Behavior on opacity { NumberAnimation { duration: Theme.prefs.reducedMotion ? 0 : Theme.fast } }
 
     Flickable {
         id: flick
         anchors.fill: parent
-        anchors.leftMargin: Theme.gapXl
-        anchors.rightMargin: Theme.gapXl
+        anchors.leftMargin: 24
+        anchors.rightMargin: 24
         contentHeight: column.implicitHeight + Theme.gapXl
         clip: true
         boundsBehavior: Flickable.StopAtBounds
@@ -80,8 +120,29 @@ Item {
 
         Column {
             id: column
-            width: Math.min(flick.width, 720)
-            spacing: Theme.gapXl
+            width: Math.min(flick.width, 860)
+            spacing: 26
+
+            Column {
+                width: parent.width
+                spacing: 6
+                Text {
+                    text: root.title
+                    color: Theme.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fzTitle
+                    font.weight: Font.Bold
+                    font.letterSpacing: -0.6
+                }
+                Text {
+                    width: parent.width
+                    text: root.description
+                    color: Theme.dim
+                    wrapMode: Text.WordWrap
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fzSmall
+                }
+            }
         }
     }
 
@@ -92,9 +153,6 @@ Item {
     // screen for the length of the cross-fade and both panes would claim the
     // wheel, with declaration order deciding which won.
     //
-    // Nothing else here reads `enabled`: AppButton dims on its own
-    // `enabledAction`, and ToggleSwitch, NumberSetting and Pill never look at
-    // it. So a leaving page does not flash grey on the way out.
     enabled: current
 
     SmoothWheel { target: flick }

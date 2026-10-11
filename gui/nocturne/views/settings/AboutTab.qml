@@ -5,6 +5,8 @@ import "../../components"
 // The reference card: what the keys do, and what this package is.
 SettingsPane {
     id: pane
+    title: "About"
+    description: "App details and shortcuts to get around faster."
 
     onActiveChanged: {
         if (!active)
@@ -16,16 +18,19 @@ SettingsPane {
     }
 
     // ==================================================== shortcuts
-    Column {
+    SettingsGroup {
+        title: "Keyboard shortcuts"
+        keywords: "keys keyboard seek volume search"
         id: keyboard
         width: parent.width
         spacing: Theme.gapSm
 
-        SectionLabel { text: "KEYBOARD" }
+
 
         Grid {
             width: parent.width
-            columns: 2
+            id: shortcutGrid
+            columns: width < 660 ? 1 : 2
             rowSpacing: 2
             columnSpacing: Theme.gapLg
 
@@ -43,7 +48,7 @@ SettingsPane {
 
                 delegate: Item {
                     required property var modelData
-                    width: (keyboard.width - Theme.gapLg) / 2
+                    width: (shortcutGrid.width - (shortcutGrid.columns - 1) * Theme.gapLg) / shortcutGrid.columns
                     height: 30
 
                     Text {
@@ -71,14 +76,15 @@ SettingsPane {
         }
     }
 
-    Rectangle { width: parent.width; height: 1; color: Theme.line }
 
     // ======================================================== about
-    Column {
+    SettingsGroup {
+        title: "Kroma Player"
+        keywords: "version build interface API"
         width: parent.width
         spacing: 4
 
-        SectionLabel { text: "ABOUT" }
+
 
         // The application's own version, which this card never named. It is the
         // first thing any bug report needs — the GUI API version below says

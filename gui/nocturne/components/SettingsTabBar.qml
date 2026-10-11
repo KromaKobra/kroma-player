@@ -1,128 +1,113 @@
 import QtQuick
+import QtQuick.Controls
 import Nocturne
 
-// Underline tabs for a page's sub-sections.
-//
-// Follows NavRail's convention rather than Pill's: this never assigns to its
-// own `currentIndex`. It draws the index it is handed and emits `selected`,
-// leaving the page that owns the index as the only thing that can change it.
-// Pill does the opposite, which is exactly why the settings pills need pushing
-// back into sync by hand every time the backend disagrees with them — a tab bar
-// restored from preferences would have the same problem.
+// The parent owns selection and persistence. This navigation adapts to the
+// space left by the app's sidebars without hiding any category.
 Item {
     id: root
-
     property var tabs: []
+    property var descriptions: []
+    property var icons: ["settings", "volumeHigh", "mic", "library", "sparkle", "download", "info"]
     property int currentIndex: 0
-
-    // Breathing room either side of a label. Also the underline's overhang:
-    // it runs half of this past the text at each end, so it reads as belonging
-    // to the word rather than to the whole hit target.
-    property int itemPadding: 15
-    property int sideMargin: Theme.gapXl
-
+    property bool compact: false
     signal selected(int index)
-
-    implicitHeight: 42
-
-    // The delegate for the current tab, or null before the Repeater has built
-    // them. Everything about the underline comes off this: the Row has already
-    // worked out where each label sits, so there is nothing to recompute here
-    // and nothing to drift out of step when a label's width settles late.
-    readonly property Item currentTab:
-        currentIndex >= 0 && currentIndex < row.children.length
-        ? row.children[currentIndex] : null
-
-    // Scrolling over the strip moves one tab at a time, down or right for the
-    // next. Raised as selected() rather than written here, for the same reason
-    // the click is: the index belongs to the page, and coming back around
-    // through it is what keeps the preference write and the glide on one path.
-    WheelSteps {
-        anchors.fill: parent
-        onStepped: function (delta) {
-            var next = Math.max(
-                0, Math.min(root.tabs.length - 1, root.currentIndex + delta))
-            if (next !== root.currentIndex)
-                root.selected(next)
-        }
+    implicitHeight: compact ? 46 : column.implicitHeight
+    function ensureCurrentVisible() {
+        var item = compact ? horizontalTabs.itemAt(currentIndex) : verticalTabs.itemAt(currentIndex)
+        if (!item) return
+        if (compact) flick.contentX = Math.max(0, Math.min(item.x, flick.contentWidth - flick.width))
+        else flick.contentY = Math.max(0, Math.min(item.y, flick.contentHeight - flick.height))
     }
-
-    Row {
-        id: row
-        anchors.left: parent.left
-        // Pulled back by the first label's own padding, so the text starts on
-        // the same vertical as the page title above it rather than the hit
-        // target around it.
-        anchors.leftMargin: root.sideMargin - root.itemPadding
-        anchors.top: parent.top
-        anchors.bottom: rule.top
-
-        Repeater {
-            model: root.tabs
-
-            delegate: Item {
-                id: tab
-                required property int index
-                required property var modelData
-
-                width: label.implicitWidth + root.itemPadding * 2
-                height: row.height
-
-                Text {
-                    id: label
-                    anchors.centerIn: parent
-                    text: tab.modelData
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fzSmall
-                    font.weight: root.currentIndex === tab.index
-                                 ? Font.DemiBold : Font.Medium
-                    color: root.currentIndex === tab.index
-                           ? Theme.text
-                           : (tabMouse.containsMouse ? Theme.dim : Theme.faint)
-
-                    Behavior on color { ColorAnimation { duration: Theme.fast } }
-                }
-
-                MouseArea {
-                    id: tabMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.selected(tab.index)
-                }
+    onCurrentIndexChanged: Qt.callLater(ensureCurrentVisible)
+    onCompactChanged: Qt.callLater(ensureCurrentVisible)
+    Flickable {
+        id: flick
+        anchors.fill: parent
+        contentWidth: root.compact ? row.implicitWidth : width
+        contentHeight: root.compact ? height : column.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        Column {
+            id: column
+            width: parent.width
+            spacing: 5
+            visible: !root.compact
+            Repeater {
+                id: verticalTabs
+                model: root.compact ? [] : root.tabs
+                delegate: navItem
+            }
+        }
+        Row {
+            id: row
+            spacing: 5
+            visible: root.compact
+            Repeater {
+                id: horizontalTabs
+                model: root.compact ? root.tabs : []
+                delegate: navItem
             }
         }
     }
-
-    // The rule runs the full width of the page and the underline is drawn over
-    // it, so the accent reads as a piece of the divider lit up rather than as a
-    // second bar floating above one.
-    Rectangle {
-        id: rule
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        height: 1
-        color: Theme.line
-    }
-
-    Rectangle {
-        anchors.bottom: parent.bottom
-        height: 2
-        radius: 1
-        color: Theme.accent
-
-        x: root.currentTab
-           ? row.x + root.currentTab.x + root.itemPadding / 2 : 0
-        width: root.currentTab
-               ? root.currentTab.width - root.itemPadding : 0
-        opacity: width > 0 ? 1 : 0
-
-        Behavior on x {
-            NumberAnimation { duration: Theme.normal; easing.type: Theme.easing }
+    WheelSteps {
+        anchors.fill: parent
+        onStepped: function(delta) {
+            var next = Math.max(0, Math.min(root.tabs.length - 1, root.currentIndex + delta))
+            if (next !== root.currentIndex) root.selected(next)
         }
-        Behavior on width {
-            NumberAnimation { duration: Theme.normal; easing.type: Theme.easing }
+    }
+    Component {
+        id: navItem
+        Button {
+            id: button
+            required property int index
+            required property var modelData
+            width: root.compact ? title.implicitWidth + 30 : root.width
+            height: root.compact ? 40 : 64
+            Accessible.name: modelData
+            Accessible.role: Accessible.PageTab
+            Accessible.selected: root.currentIndex === index
+            onClicked: root.selected(index)
+            background: Rectangle {
+                radius: Theme.radius
+                color: root.currentIndex === button.index ? Theme.accentSoft
+                       : button.down ? Theme.raised : button.hovered ? Theme.alpha(Theme.text, 0.04) : "transparent"
+                border.color: button.visualFocus ? Theme.accent : "transparent"
+            }
+            contentItem: Item {
+                Icon {
+                    visible: !root.compact
+                    x: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: root.icons[button.index] || "settings"
+                    size: 18
+                    color: root.currentIndex === button.index ? Theme.accent : Theme.dim
+                }
+                Column {
+                    x: root.compact ? 8 : 36
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width - x - 6
+                    spacing: 4
+                    Text {
+                        id: title
+                        text: button.modelData
+                        color: root.currentIndex === button.index ? Theme.text : Theme.dim
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fzBody
+                        font.weight: Font.DemiBold
+                    }
+                    Text {
+                        width: parent.width
+                        visible: !root.compact
+                        text: root.descriptions[button.index] || ""
+                        color: Theme.dim
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fzTiny
+                        elide: Text.ElideRight
+                    }
+                }
+            }
         }
     }
 }

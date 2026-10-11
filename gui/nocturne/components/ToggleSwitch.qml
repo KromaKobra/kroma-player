@@ -1,74 +1,47 @@
 import QtQuick
+import QtQuick.Controls
 import Nocturne
 
-Item {
+SettingRow {
     id: root
-
+    property string accessibleLabel: label
     property bool checked: false
-    property string label: ""
-    property string description: ""
-
     signal toggled(bool value)
-
-    implicitHeight: Math.max(38, textColumn.implicitHeight + 12)
-    implicitWidth: 300
-
-    Column {
-        id: textColumn
-        anchors.left: parent.left
-        anchors.right: knob.left
-        anchors.rightMargin: Theme.gap
-        anchors.verticalCenter: parent.verticalCenter
-        spacing: 2
-
-        Text {
-            width: parent.width
-            text: root.label
-            color: Theme.text
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fzBody
-            font.weight: Font.Medium
-        }
-        Text {
-            width: parent.width
-            text: root.description
-            visible: text !== ""
-            wrapMode: Text.WordWrap
-            color: Theme.faint
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fzTiny
-        }
-    }
-
-    Rectangle {
-        id: knob
-        anchors.right: parent.right
-        anchors.verticalCenter: parent.verticalCenter
-        width: 42
-        height: 24
-        radius: 12
-        color: root.checked ? Theme.accent : Theme.alpha(Theme.text, 0.12)
-        border.width: 1
-        border.color: root.checked ? Theme.accent : Theme.line
-
-        Behavior on color { ColorAnimation { duration: Theme.normal } }
-
-        Rectangle {
-            width: 18
-            height: 18
-            radius: 9
-            color: root.checked ? Theme.accentInk : Theme.dim
-            anchors.verticalCenter: parent.verticalCenter
-            x: root.checked ? parent.width - width - 3 : 3
-
-            Behavior on x { NumberAnimation { duration: Theme.normal; easing.type: Theme.easing } }
-            Behavior on color { ColorAnimation { duration: Theme.normal } }
-        }
-    }
-
-    MouseArea {
-        anchors.fill: parent
-        cursorShape: Qt.PointingHandCursor
+    stacked: false
+    controlWidth: 50
+    AbstractButton {
+        id: control
+        width: 50
+        height: 36
+        padding: 0
+        checked: root.checked
+        Accessible.name: root.accessibleLabel
+        Accessible.description: root.description
         onClicked: root.toggled(!root.checked)
+        checkable: false
+        Accessible.role: Accessible.CheckBox
+        Accessible.checked: root.checked
+        background: Rectangle {
+            x: 2
+            y: 5
+            width: 46
+            height: 26
+            radius: 13
+            color: root.checked ? Theme.accent : Theme.alpha(Theme.text, control.down ? 0.25 : 0.15)
+            border.color: control.visualFocus ? Theme.text : "transparent"
+            border.width: 2
+            Rectangle {
+                x: root.checked ? 23 : 3
+                y: 3
+                width: 20
+                height: 20
+                radius: 10
+                color: root.checked ? Theme.accentInk : Theme.text
+                Behavior on x {
+                    enabled: !Theme.prefs.reducedMotion
+                    NumberAnimation { duration: Theme.fast; easing.type: Easing.OutCubic }
+                }
+            }
+        }
     }
 }

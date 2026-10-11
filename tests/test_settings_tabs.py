@@ -223,3 +223,54 @@ def test_the_tab_bar_does_not_own_its_own_index(gui):
         "under the wrong name, or the bar is writing its own index and the "
         "view's binding has been destroyed"
     )
+
+
+def test_search_finds_a_setting_in_another_category_and_reveals_it(gui):
+    from PySide6.QtCore import QObject
+
+    window, app = gui
+    _go(window, app, 0)
+    view = window.findChild(QObject, "settingsView")
+    search = window.findChild(QObject, "settingsSearch")
+    search.setProperty("text", "history length")
+    app.processEvents()
+    results = view.property("searchResults").toVariant()
+    assert [r["label"] for r in results] == ["History length"]
+    search.accepted.emit()
+    _settle(app)
+    assert view.property("currentTab") == 1
+    assert search.property("text") == ""
+    pane = window.findChild(QObject, "playbackTab")
+    assert pane.property("highlightedItem").property("label") == "History length"
+
+
+def test_search_matches_description_keywords_and_has_an_empty_state(gui):
+    from PySide6.QtCore import QObject
+
+    window, app = gui
+    view = window.findChild(QObject, "settingsView")
+    search = window.findChild(QObject, "settingsSearch")
+    search.setProperty("text", "HEADPHONES")
+    app.processEvents()
+    assert any(r["label"] == "Output device" for r in view.property("searchResults").toVariant())
+    search.setProperty("text", "no-setting-has-this-name")
+    app.processEvents()
+    assert view.property("searchResults").toVariant() == []
+    search.setProperty("text", "")
+    assert view.property("searchResults").toVariant() == []
+
+
+def test_narrow_settings_keep_every_category(gui):
+    from PySide6.QtCore import QObject
+
+    window, app = gui
+    original_width = window.width()
+    window.setWidth(940)
+    _go(window, app, 1)
+    bar = _tab_bar(window)
+    assert bar.property("compact")
+    assert bar.property("tabs").toVariant() == [
+        "Appearance", "Playback", "Backing", "Library", "Plugins", "System", "About"
+    ]
+    window.setWidth(original_width)
+    app.processEvents()

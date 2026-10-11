@@ -6,6 +6,8 @@ import "../../components"
 // the programs it and its plugins need but do not ship are installed.
 SettingsPane {
     id: pane
+    title: "System"
+    description: "Keep Kroma and its supporting tools ready to play."
 
     readonly property bool hasUpdates: typeof updatesVM !== "undefined"
 
@@ -165,12 +167,15 @@ SettingsPane {
     // property arrived in GUI API 11, and this package still has to load on a
     // backend that predates it. On such a backend the whole section is absent
     // rather than broken, which is the same bargain every other tab makes.
-    Column {
+    SettingsGroup {
+        title: "App updates"
+        keywords: "version release upgrade backup"
         width: parent.width
         spacing: Theme.gapSm
         visible: pane.hasUpdates
+        searchAvailable: pane.hasUpdates
 
-        SectionLabel { text: "KROMA PLAYER" }
+
 
         // Always, whatever else is on screen. The version is the first thing
         // any bug report needs, and once there is an updater it is the number
@@ -502,13 +507,15 @@ SettingsPane {
     // None of these ship with Kroma Player, so on any given machine any of them
     // may be missing. Without this the news arrives as a failed import or a
     // refused export, which is a poor way to hear it.
-    Column {
+    SettingsGroup {
+        title: "Required programs"
+        keywords: "ffmpeg ffprobe dependencies tools path install"
         width: parent.width
         spacing: Theme.gap
 
         // The tab holds two sections now, so both carry a heading — the note
         // that used to be here explained why a single-section tab has none.
-        SectionLabel { text: "DEPENDENCIES" }
+
 
         Text {
             width: parent.width

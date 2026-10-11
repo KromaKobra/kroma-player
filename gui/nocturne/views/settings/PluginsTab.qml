@@ -20,6 +20,8 @@ import "../../components"
 //    "uninstall" usually means the opposite.
 SettingsPane {
     id: pane
+    title: "Plugins"
+    description: "Add capabilities and manage what each extension can do."
 
     readonly property bool hasPlugins: typeof pluginsVM !== "undefined" && pluginsVM !== null
     readonly property var plugins: hasPlugins ? pluginsVM.plugins : []
@@ -72,11 +74,13 @@ SettingsPane {
     }
 
     // ============================================================ installed
-    Column {
+    SettingsGroup {
+        title: "Installed plugins"
+        keywords: "install extensions permissions consent search download"
         width: parent.width
         spacing: Theme.gap
 
-        SectionLabel { text: "PLUGINS" }
+
 
         Text {
             width: parent.width
@@ -123,14 +127,16 @@ SettingsPane {
     // Only when two enabled plugins offer the same thing — which, with one
     // plugin, is never. The first is asked first; a later one is asked only
     // when every one before it had nothing.
-    Column {
+    SettingsGroup {
+        title: "Provider priority"
+        keywords: "order first fallback"
         width: parent.width
         spacing: Theme.gap
         visible: pane.hasPlugins && pluginsVM.contestedKinds.length > 0
+        searchAvailable: pane.hasPlugins && pluginsVM.contestedKinds.length > 0
 
-        Rectangle { width: parent.width; height: 1; color: Theme.line }
 
-        SectionLabel { text: "ORDER" }
+
 
         Text {
             width: parent.width
@@ -209,14 +215,16 @@ SettingsPane {
     }
 
     // ================================================================ jobs
-    Column {
+    SettingsGroup {
+        title: "Running tasks"
+        keywords: "jobs cancel progress"
         width: parent.width
         spacing: 4
         visible: pane.hasPlugins && pluginsVM.jobs.length > 0
+        searchAvailable: pane.hasPlugins && pluginsVM.jobs.length > 0
 
-        Rectangle { width: parent.width; height: 1; color: Theme.line }
 
-        SectionLabel { text: "WORKING" }
+
 
         Repeater {
             model: pane.hasPlugins ? pluginsVM.jobs : []
@@ -241,6 +249,10 @@ SettingsPane {
         id: card
 
         property var plugin: ({})
+        property bool highlighted: false
+        readonly property string label: String(plugin.name || plugin.id || "")
+        readonly property string description: String(plugin.description || "")
+        readonly property string settingsSearchText: label + " " + description + " " + (plugin.provides || []).join(" ")
 
         readonly property bool missing: plugin.source === "missing"
         readonly property bool dev: plugin.source === "dev"
@@ -254,7 +266,7 @@ SettingsPane {
         radius: Theme.radius
         color: Theme.alpha(Theme.card, 0.72)
         border.width: 1
-        border.color: Theme.line
+        border.color: highlighted ? Theme.accent : Theme.line
         objectName: "plugin:" + String(plugin.id || "")
 
         Column {
@@ -320,6 +332,7 @@ SettingsPane {
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     width: 60
+                    accessibleLabel: "Enable " + card.label
                     checked: card.plugin.enabled === true
                     enabled: !card.missing && pane.hasPlugins && !pluginsVM.safeMode
                     onToggled: function (value) { pluginsVM.setEnabled(card.plugin.id, value) }
@@ -413,32 +426,14 @@ SettingsPane {
                     }
                     Component {
                         id: enumSetting
-                        Column {
+                        ChoiceSetting {
                             width: settingLoader.width
-                            spacing: 4
-                            Text {
-                                text: settingLoader.modelData.label
-                                color: Theme.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fzSmall
-                            }
-                            Pill {
-                                options: settingLoader.modelData.values
-                                currentIndex: Math.max(0, settingLoader.modelData.values
-                                                       .indexOf(settingLoader.modelData.value))
-                                onSelected: function (index) {
-                                    pluginsVM.setSetting(card.plugin.id, settingLoader.modelData.key,
-                                                         settingLoader.modelData.values[index])
-                                }
-                            }
-                            Text {
-                                width: parent.width
-                                visible: text !== ""
-                                wrapMode: Text.WordWrap
-                                text: settingLoader.modelData.description || ""
-                                color: Theme.faint
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fzTiny
+                            label: settingLoader.modelData.label
+                            description: settingLoader.modelData.description || ""
+                            options: settingLoader.modelData.values
+                            currentIndex: settingLoader.modelData.values.indexOf(settingLoader.modelData.value)
+                            onSelected: function(index) {
+                                pluginsVM.setSetting(card.plugin.id, settingLoader.modelData.key, settingLoader.modelData.values[index])
                             }
                         }
                     }
@@ -463,11 +458,11 @@ SettingsPane {
                     }
                     Component {
                         id: textSetting
-                        EditFieldRow {
+                        TextSetting {
                             width: settingLoader.width
                             label: settingLoader.modelData.label
-                            hint: settingLoader.modelData.description || ""
-                            Component.onCompleted: text = String(settingLoader.modelData.value || "")
+                            description: settingLoader.modelData.description || ""
+                            text: String(settingLoader.modelData.value || "")
                             onEdited: function (text) {
                                 pluginsVM.setSetting(card.plugin.id, settingLoader.modelData.key, text)
                             }
