@@ -39,7 +39,7 @@ Window {
     SidebarResizeHandle {
         id: handle
         objectName: "handle"
-        x: panel.x - width / 2
+        x: Math.min(panel.x - width / 2, window.width - width)
         height: panel.height
         expandedWidth: window.preferredWidth
         collapsed: !window.panelOpen
@@ -48,7 +48,6 @@ Window {
         maximumWidth: 520
         rightSidebar: true
         reducedMotion: window.reducedMotion
-        visible: panel.width > 0 || pressed
         onResizeCommitted: function (preferred, collapse) {
             window.preferredWidth = preferred
             window.panelOpen = !collapse
@@ -92,7 +91,7 @@ def test_drag_tracks_pointer_and_reopens_at_custom_width(sidebar):
     window.setProperty("panelOpen", False)
     QTest.qWait(650)
     assert panel.width() == 0
-    assert not handle.isVisible()
+    assert handle.isVisible()
     assert not handle.property("animating")
     window.setProperty("panelOpen", True)
     QTest.qWait(650)
@@ -102,20 +101,23 @@ def test_drag_tracks_pointer_and_reopens_at_custom_width(sidebar):
 def test_drag_right_beyond_threshold_closes_completely(sidebar):
     window, panel, handle = sidebar
     end = _drag(window, handle, 190)
-    assert panel.width() == pytest.approx(130, abs=1)
+    assert handle.property("previewCollapsed")
+    assert window.property("panelOpen")
+    QTest.qWait(650)
+    assert panel.width() == 0
     assert handle.property("pressed")
     _release(window, end)
     assert not window.property("panelOpen")
     assert panel.width() == 0
     assert not panel.isVisible()
-    assert not handle.isVisible()
+    assert handle.isVisible()
     assert window.property("preferredWidth") == 320
 
 
 def test_small_rightward_drag_stays_open_at_minimum_width(sidebar):
     window, panel, handle = sidebar
     end = _drag(window, handle, 120)
-    assert panel.width() == pytest.approx(200, abs=1)
+    assert 220 < panel.width() < 240
     # A held resize tests the distance threshold independently of flick velocity.
     QTest.qWait(110)
     _release(window, end)
@@ -152,13 +154,14 @@ def test_grab_closing_panel_tracks_from_current_width(sidebar):
 def test_drag_to_zero_keeps_pointer_capture_until_release(sidebar):
     window, panel, handle = sidebar
     end = _drag(window, handle, 350)
+    QTest.qWait(650)
     assert panel.width() == 0
     assert handle.property("pressed")
     assert handle.isVisible()
     _release(window, end)
     assert not window.property("panelOpen")
     assert panel.width() == 0
-    assert not handle.isVisible()
+    assert handle.isVisible()
 
 
 def test_fast_drag_and_window_constraint_keep_width_in_bounds(sidebar):
@@ -186,7 +189,7 @@ def test_reduced_motion_still_resizes_directly_and_snaps(sidebar):
     window.setProperty("panelOpen", True)
     assert panel.width() == 320
     end = _drag(window, handle, 200)
-    assert panel.width() == 120
+    assert panel.width() == 0
     _release(window, end)
     assert panel.width() == 0
     assert not handle.property("animating")
@@ -200,9 +203,12 @@ def test_actual_window_reclaims_space_and_saves_closed_state(application_gui):
     nav = window.findChild(QQuickItem, "navRail")
     settings = QQmlEngine.contextForObject(window).contextProperty("settingsVM")
     assert panel.width() == 0
-    assert not handle.isVisible()
-    window.setProperty("infoOpen", True)
-    QTest.qWait(650)
+    assert handle.isVisible()
+    end = _drag(window, handle, -320)
+    assert not window.property("infoOpen")
+    assert handle.property("pressed")
+    _release(window, end)
+    assert window.property("infoOpen")
     assert panel.width() == 320
     end = _drag(window, handle, -80)
     assert panel.width() == pytest.approx(400, abs=1)
@@ -212,7 +218,7 @@ def test_actual_window_reclaims_space_and_saves_closed_state(application_gui):
     _release(window, end)
     assert not window.property("infoOpen")
     assert panel.width() == 0
-    assert not handle.isVisible()
+    assert handle.isVisible()
     assert content.width() == pytest.approx(window.width() - nav.width(), abs=1)
     QTest.keyClick(window, Qt.Key_I, Qt.ControlModifier)
     QTest.qWait(650)

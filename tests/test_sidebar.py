@@ -98,6 +98,8 @@ def test_drag_tracks_mouse_and_toggle_restores_custom_width(sidebar):
     end = _drag(window, rail, 72)
     assert rail.width() == pytest.approx(312, abs=1)
     QTest.mouseRelease(window, Qt.LeftButton, Qt.NoModifier, end)
+    QTest.qWait(50)
+    assert rail.width() == pytest.approx(312, abs=1)
     _settle()
     assert rail.property("expandedWidth") == pytest.approx(312, abs=1)
     toggle = rail.findChild(QQuickItem, "sidebarToggle")
@@ -112,7 +114,12 @@ def test_drag_tracks_mouse_and_toggle_restores_custom_width(sidebar):
 def test_drag_left_snaps_and_can_expand_from_icons(sidebar):
     window, rail = sidebar
     end = _drag(window, rail, -110)
-    assert rail.width() == pytest.approx(130, abs=1)
+    handle = rail.findChild(QQuickItem, "sidebarResizeHandle")
+    assert handle.property("previewCollapsed")
+    assert not rail.property("collapsed")
+    assert handle.property("pressed")
+    _settle()
+    assert rail.width() == 64
     QTest.mouseRelease(window, Qt.LeftButton, Qt.NoModifier, end)
     _settle()
     assert rail.property("collapsed")

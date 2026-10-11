@@ -584,7 +584,7 @@ Window {
     SidebarResizeHandle {
         id: infoResize
         objectName: "infoResizeHandle"
-        x: infoPanel.x - width / 2
+        x: Math.min(infoPanel.x - width / 2, mainWindow.width - width)
         anchors.top: infoPanel.top
         anchors.bottom: infoPanel.bottom
         expandedWidth: mainWindow.infoWidth
@@ -595,7 +595,6 @@ Window {
         collapseThreshold: 156
         rightSidebar: true
         reducedMotion: Theme.prefs.reducedMotion
-        visible: infoPanel.width > 0 || pressed
         onResizeCommitted: function (preferredWidth, collapse) {
             mainWindow.infoWidth = preferredWidth
             mainWindow.infoOpen = !collapse
