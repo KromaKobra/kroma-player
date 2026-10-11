@@ -47,6 +47,7 @@ DESKTOP_FILE_NAME = "kroma-player"
 # change; removing or renaming one requires a GUI_API_VERSION bump.
 CONTEXT_PROPERTIES = {
     "playerVM":         "player_view_model",
+    "artworkPaletteVM": "artwork_palette_view_model",
     "searchVM":         "search_view_model",
     "queueVM":          "queue_view_model",
     "historyVM":        "history_view_model",

@@ -73,7 +73,9 @@ SettingsPane {
         Text {
             width: parent.width
             wrapMode: Text.WordWrap
-            text: "Kroma means colour. Pick the one this interface runs on."
+            text: Theme.prefs.followArtwork
+                ? "Pick the fallback colour for tracks without artwork."
+                : "Kroma means colour. Pick the one this interface runs on."
             color: Theme.dim
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fzSmall
@@ -156,6 +158,14 @@ SettingsPane {
                     }
                 }
             }
+        }
+
+        ToggleSwitch {
+            width: parent.width
+            label: "Follow the artwork"
+            description: "Use the playing track's cover colour for accents. Falls back to your selected colour when artwork is unavailable."
+            checked: Theme.prefs.followArtwork
+            onToggled: function (value) { Theme.prefs.followArtwork = value }
         }
 
         ToggleSwitch {

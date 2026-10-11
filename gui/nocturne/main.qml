@@ -26,6 +26,18 @@ Window {
     color: Theme.bg
     title: "Kroma Player"
 
+    Binding {
+        target: typeof artworkPaletteVM !== "undefined" ? artworkPaletteVM : null
+        property: "coverHash"
+        value: Theme.prefs.followArtwork ? playerVM.current_track_cover_hash : ""
+    }
+
+    Binding {
+        target: Theme
+        property: "artworkPalette"
+        value: typeof artworkPaletteVM !== "undefined" ? artworkPaletteVM.palette : ({})
+    }
+
     // ------------------------------------------------------------------ state
 
     // Restore the main collection destinations or Home (13). Editors and

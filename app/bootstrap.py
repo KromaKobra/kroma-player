@@ -43,6 +43,7 @@ from app.viewmodels.playlist_tracks_view_model import PlaylistTracksViewModel
 from app.artwork.cover_store import CoverStore
 from app.artwork.cover_service import CoverService
 from app.artwork.cover_provider import CoverImageProvider
+from app.viewmodels.artwork_palette_view_model import ArtworkPaletteViewModel
 from app.utils.library_paths import covers_db_path, data_root, tracks_db_path
 from app.system.mpris import MprisService
 from app.system.mpris_art import CACHE_DIR_NAME
@@ -141,6 +142,7 @@ def create_service_registry() -> ServiceRegistry:
     registry.register('cover_store', cover_store)
     registry.register('cover_service', cover_service)
     registry.register('cover_provider', cover_provider)
+    registry.register('artwork_palette_view_model', ArtworkPaletteViewModel(cover_store))
     
     # Setup repositories
     track_repo = TrackRepository(session)

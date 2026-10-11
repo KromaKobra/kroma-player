@@ -40,6 +40,9 @@ QtObject {
         property string accent: SettingsStore.value("accent", "aurora")
         onAccentChanged: if (root._ready) SettingsStore.setValue("accent", accent)
 
+        property bool followArtwork: SettingsStore.value("followArtwork", false)
+        onFollowArtworkChanged: if (root._ready) SettingsStore.setValue("followArtwork", followArtwork)
+
         // "dark" | "light" | "system". Defaults to following the desktop:
         // an interface that opens bright on a dark desktop at midnight is the
         // one complaint a music player cannot answer for.
@@ -199,7 +202,11 @@ QtObject {
     })
 
     readonly property var accentKeys: ["aurora", "ember", "bloom", "verdant", "ice", "gold"]
-    readonly property var _acc: accentTable[prefs.accent] || accentTable["aurora"]
+    // The window bridges the backend into this singleton. Keep the user's
+    // preset intact so switching off artwork restores it immediately.
+    property var artworkPalette: ({})
+    readonly property var _acc: prefs.followArtwork && artworkPalette.a
+        ? artworkPalette : (accentTable[prefs.accent] || accentTable["aurora"])
 
     readonly property color accent:    isLight ? _acc.la : _acc.a
     readonly property color accentAlt: isLight ? _acc.lb : _acc.b
