@@ -662,7 +662,7 @@ def test_the_cell_offers_a_button_exactly_when_the_backend_accepts_one(
         f"""
         import QtQuick
         import Nocturne
-        import "{components}"
+        import "{components}/tracks"
 
         Item {{
         {cells}
@@ -766,7 +766,7 @@ def test_the_list_scrolls_so_the_new_rows_read_as_the_top(qt_app, vm, tmp_path):
         import QtQuick
         import QtQuick.Window
         import Nocturne
-        import "{components}"
+        import "{components}/tracks"
 
         Window {{
             visible: true

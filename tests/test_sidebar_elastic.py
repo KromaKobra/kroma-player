@@ -19,7 +19,7 @@ def edge(qt_app, request):
     engine.loadData(b'''
 import QtQuick
 import QtQuick.Window
-import "components"
+import "components/shell"
 Window {
     id: window
     width: 1000; height: 720; visible: true

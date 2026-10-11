@@ -33,7 +33,7 @@ def chrome(qt_app):
     engine.loadData(b'''
 import QtQuick
 import QtQuick.Window
-import "components"
+import "components/shell"
 Window {
     id: window
     width: 940; height: 400; visible: true

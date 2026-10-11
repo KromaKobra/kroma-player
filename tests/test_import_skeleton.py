@@ -84,7 +84,7 @@ def _build(qt_app, *, height=600, width=800, active=False, row_height=58,
     harness = f"""
     import QtQuick
     import Nocturne
-    import "components"
+    import "components/tracks"
 
     Item {{
         width: {width}; height: {height}

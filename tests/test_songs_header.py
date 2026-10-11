@@ -19,7 +19,7 @@ def header(qt_app):
     engine.loadData(b'''
 import QtQuick
 import Nocturne
-import "components"
+import "components/library"
 Window {
     id: window
     width: 900; height: 240; visible: true

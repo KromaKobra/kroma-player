@@ -22,7 +22,7 @@ def controls(qt_app):
     engine.loadData(b'''
 import QtQuick
 import Nocturne
-import "components"
+import "components/settings"
 Window {
     id: window
     width: 640; height: 520; visible: true

@@ -20,7 +20,7 @@ def sidebar(qt_app):
     engine.loadData(b'''
 import QtQuick
 import QtQuick.Window
-import "components"
+import "components/shell"
 Window {
     id: probe
     width: 1000; height: 720; visible: true

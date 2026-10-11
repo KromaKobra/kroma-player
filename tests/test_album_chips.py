@@ -74,7 +74,7 @@ def chips(qt_app, backend):
     engine.warnings.connect(lambda w: warnings.extend(w))
 
     component = QQmlComponent(
-        engine, QUrl.fromLocalFile(str(NOCTURNE / "components" / "AlbumChips.qml"))
+        engine, QUrl.fromLocalFile(str(NOCTURNE / "components" / "chips" / "AlbumChips.qml"))
     )
     item = component.create()
     assert item is not None, component.errorString()

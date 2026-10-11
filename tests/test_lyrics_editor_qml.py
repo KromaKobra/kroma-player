@@ -3,7 +3,7 @@
 `tests/test_lyrics_edit.py` covers what the view model does with a finished
 draft, and `tests/test_lyrics_editing.py` covers the arithmetic under it. What
 neither reaches is the part in between: the draft itself lives in a QML
-`ListModel` in `gui/nocturne/views/NowPlayingView.qml`, deliberately, because a
+`ListModel` in `gui/nocturne/views/playback/NowPlayingView.qml`, deliberately, because a
 per-keystroke conversation with the backend would rewrite the list the editor's
 own text fields are reading and Qt drops a field's binding the moment somebody
 types into it.
@@ -37,7 +37,7 @@ if str(REPO_ROOT) not in sys.path:
 HARNESS = """
 import QtQuick
 import Nocturne
-import "views"
+import "views/playback"
 
 Window {
     width: 1600
@@ -101,7 +101,7 @@ def editor(qt_app, tmp_path_factory):
         context.setContextProperty(qml_name, registry.get_service(service))
     engine.addImportPath(str(directory))
 
-    # The harness has to sit inside the package so `import "views"` resolves.
+    # The harness has to sit inside the package so `import "views/playback"` resolves.
     harness = directory / "__LyricsEditorHarness.qml"
     harness.write_text(HARNESS)
     try:

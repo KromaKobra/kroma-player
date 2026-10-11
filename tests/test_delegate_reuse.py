@@ -39,7 +39,7 @@ if str(REPO_ROOT) not in sys.path:
 from test_cover_masks import _block_at  # noqa: E402
 from test_gui_packages import CONTEXT_PROPERTIES, backend  # noqa: E402,F401
 
-TRACK_TABLE = REPO_ROOT / "gui" / "nocturne" / "components" / "TrackTable.qml"
+TRACK_TABLE = REPO_ROOT / "gui" / "nocturne" / "components" / "tracks" / "TrackTable.qml"
 
 
 def _source() -> str:
@@ -66,7 +66,7 @@ def _properties_written_by_exit(source: str) -> set[str]:
 
 def test_rows_are_pooled():
     assert re.search(r"LibraryList\s*\{", _source())
-    source = (TRACK_TABLE.parent / "LibraryList.qml").read_text()
+    source = (TRACK_TABLE.parent.parent / "library" / "LibraryList.qml").read_text()
     assert re.search(r"reuseItems:\s*true", source), (
         "TrackTable no longer pools its rows. If that was deliberate the rest of "
         "this module is obsolete; if it was not, a fast scroll is rebuilding the "
@@ -235,7 +235,7 @@ def test_the_live_track_list_pools_its_rows(qt_app, backend):
     harness = """
     import QtQuick
     import Nocturne
-    import "components"
+    import "components/tracks"
 
     Item {
         width: 900; height: 600

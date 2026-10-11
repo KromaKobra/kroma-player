@@ -56,7 +56,7 @@ def _cell(qt_app, tmp_path, *, track_id, uid=7):
             }
         }
         """
-        % ((nocturne / "components").as_posix(), track_id, uid),
+        % ((nocturne / "components" / "tracks").as_posix(), track_id, uid),
         encoding="utf-8",
     )
 

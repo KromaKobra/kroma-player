@@ -53,7 +53,7 @@ def make_layout(qt_app):
 
     from app.gui.gui_paths import bundled_gui_root
 
-    directory = bundled_gui_root() / "nocturne" / "components"
+    directory = bundled_gui_root() / "nocturne" / "components" / "tracks"
     built = []
 
     def build(profile: str):

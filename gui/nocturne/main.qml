@@ -2,8 +2,17 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Window
 import Nocturne
-import "components"
-import "views"
+import "components/artwork"
+import "components/controls"
+import "components/dialogs"
+import "components/playback"
+import "components/shell"
+import "components/tracks"
+import "views/editing"
+import "views/importing"
+import "views/library"
+import "views/playback"
+import "views/settings"
 
 // Nocturne — the official interface for Kroma Player.
 //

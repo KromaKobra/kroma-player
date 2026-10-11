@@ -27,7 +27,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from PySide6.QtQml import QQmlApplicationEngine  # noqa: E402
+from PySide6.QtCore import QUrl  # noqa: E402
+from PySide6.QtQml import QQmlApplicationEngine, QQmlComponent  # noqa: E402
 
 from conftest import make_track
 
@@ -98,6 +99,43 @@ def _bundle_for(gui_name: str) -> Path:
         if not bundle.is_file():
             pytest.skip(f"cannot compile {gui_name} and no bundle is present: {exc}")
     return bundle
+
+
+@pytest.mark.parametrize("gui_name", GUI_NAMES)
+@pytest.mark.parametrize("storage", ["source", "bundle"])
+def test_every_qml_file_resolves_dependencies(qt_app, backend, gui_name, storage):
+    """Compile even files behind inactive loaders, in both supported layouts."""
+    source = bundled_gui_source(gui_name)
+    engine = QQmlApplicationEngine()
+    bundle = resolved = None
+    try:
+        if storage == "bundle":
+            bundle = _bundle_for(gui_name)
+            candidate = inspect_bundle(bundle)
+            assert candidate.loadable, candidate.error
+            resolved = ResolvedGui(candidate.manifest, bundle, candidate.build_id, gui_name)
+            mount(bundle, resolved.mount_root)
+            engine.addImportPath(resolved.import_path)
+        else:
+            engine.addImportPath(str(source))
+
+        # Other GUI tests can write temporary __*Harness.qml files here while
+        # pytest-xdist runs. They are not part of the shipped component tree.
+        paths = sorted(path for path in source.rglob("*.qml")
+                       if not path.name.startswith("__"))
+        for path in paths:
+            relative = path.relative_to(source).as_posix()
+            url = (QUrl(f"qrc:{resolved.mount_root}/{relative}") if resolved
+                   else QUrl.fromLocalFile(str(path)))
+            component = QQmlComponent(engine, url)
+            assert component.status() == QQmlComponent.Status.Ready, (
+                f"{storage}/{relative}: {component.errorString()}"
+            )
+            del component
+    finally:
+        del engine
+        if resolved is not None:
+            unmount(bundle, resolved.mount_root)
 
 
 @pytest.mark.parametrize("gui_name", GUI_NAMES)

@@ -71,7 +71,7 @@ def table(qt_app, tmp_path):
     harness.write_text(f'''
 import QtQuick
 import Nocturne
-import "{(directory / 'components').as_uri()}"
+import "{(directory / 'components' / 'tracks').as_uri()}"
 Window {{
     width: 900; height: 300; visible: true
     TrackTable {{

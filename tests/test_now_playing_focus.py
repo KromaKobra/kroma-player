@@ -48,7 +48,7 @@ if str(REPO_ROOT) not in sys.path:
 HARNESS = """
 import QtQuick
 import Nocturne
-import "views"
+import "views/playback"
 
 Window {{
     width: 1600
@@ -167,7 +167,7 @@ def open_page(qt_app, tmp_path_factory):
             context.setContextProperty(qml_name, registry.get_service(service))
         engine.addImportPath(str(directory))
 
-        # The harness has to sit inside the package so `import "views"` resolves.
+        # The harness has to sit inside the package so `import "views/playback"` resolves.
         harness = directory / "__NowPlayingFocusHarness.qml"
         harness.write_text(HARNESS.format(width=width))
         opened.append((engine, harness))

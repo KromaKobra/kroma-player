@@ -97,7 +97,7 @@ def transient_rail(qt_app):
     qml = """
 import QtQuick
 import Nocturne
-import "components"
+import "components/shell"
 
 Window {
     id: probe

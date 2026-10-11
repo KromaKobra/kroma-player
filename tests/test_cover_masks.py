@@ -35,7 +35,7 @@ NOCTURNE = REPO_ROOT / "gui" / "nocturne"
 # Views that put many equally-sized covers on screen at once, and so must hand
 # every CoverArt one shared mask.
 LIST_VIEWS = [
-    NOCTURNE / "components" / "TrackTable.qml",
+    NOCTURNE / "components" / "tracks" / "TrackTable.qml",
 ]
 
 
@@ -103,12 +103,12 @@ def test_corner_mask_keeps_its_antialiasing():
     `layer.smooth` so it is not sampled nearest-neighbour), and being applied
     (needs spread on the threshold — see CoverArt.qml).
     """
-    mask = (NOCTURNE / "components" / "CornerMask.qml").read_text(encoding="utf-8")
+    mask = (NOCTURNE / "components" / "artwork" / "CornerMask.qml").read_text(encoding="utf-8")
     assert re.search(r"antialiasing:\s*true", mask)
     assert re.search(r"layer\.smooth:\s*true", mask)
     assert re.search(r"layer\.enabled:\s*true", mask)
 
-    cover = (NOCTURNE / "components" / "CoverArt.qml").read_text(encoding="utf-8")
+    cover = (NOCTURNE / "components" / "artwork" / "CoverArt.qml").read_text(encoding="utf-8")
     spread = re.search(r"maskSpreadAtMin:\s*([\d.]+)", cover)
     assert spread and float(spread.group(1)) > 0, (
         "MultiEffect's default maskSpreadAtMin of 0 applies the mask as a hard "
@@ -118,7 +118,7 @@ def test_corner_mask_keeps_its_antialiasing():
 
 def test_cover_art_only_builds_a_private_mask_when_unshared():
     """The private fallback must not allocate a texture when a mask was given."""
-    source = (NOCTURNE / "components" / "CoverArt.qml").read_text(encoding="utf-8")
+    source = (NOCTURNE / "components" / "artwork" / "CoverArt.qml").read_text(encoding="utf-8")
 
     assert "property Item maskSource" in source, "CoverArt must accept a shared mask"
     assert re.search(r"layer\.enabled:\s*root\.maskSource === null", source), (
@@ -130,9 +130,9 @@ def test_cover_art_only_builds_a_private_mask_when_unshared():
     )
 
 
-@pytest.mark.parametrize("name", ["LibraryCard.qml", "SongTile.qml"])
-def test_collection_delegates_consume_view_mask(name):
-    source = (NOCTURNE / "components" / name).read_text()
+@pytest.mark.parametrize("group, name", [("library", "LibraryCard.qml"), ("tracks", "SongTile.qml")])
+def test_collection_delegates_consume_view_mask(group, name):
+    source = (NOCTURNE / "components" / group / name).read_text()
     covers = [source[slice(*_block_at(source, match.end() - 1))]
               for match in re.finditer(r"CoverArt\s*\{", source)]
     assert covers
@@ -142,6 +142,6 @@ def test_collection_delegates_consume_view_mask(name):
 
 @pytest.mark.parametrize("name", ["LibraryGrid.qml", "LibraryList.qml"])
 def test_shared_layouts_own_one_mask(name):
-    source = (NOCTURNE / "components" / name).read_text()
+    source = (NOCTURNE / "components" / "library" / name).read_text()
     assert len(re.findall(r"CornerMask\s*\{", source)) == 1
     assert "property alias artMask: sharedMask" in source

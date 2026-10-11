@@ -54,7 +54,7 @@ Requires GUI API version 13 (Kroma Player with `docs/GUI_API.md`).
   to jump to a highlighted setting. Categories sit beside the content on wide
   windows and above it on compact windows. Grouped cards use reusable switches,
   choices, numeric editors, sliders, text fields and path controls. See the
-  [settings component guide](components/README.md) to add more.
+  [settings component guide](components/settings/README.md) to add more.
 
 Multi-select works throughout with click, Ctrl-click, and Shift-click; the
 right-click menu acts on the whole selection.
@@ -349,39 +349,32 @@ Nocturne/             QML module — design tokens and primitives
   Icon, IconButton, Pill, NocturneTooltip
   SmoothWheel.qml       browser-like wheel and trackpad scrolling for a Flickable
   WheelSteps.qml        the same input read as whole steps, for the rail and tabs
-components/           Reusable pieces
-  TrackTable.qml        the track list used by five of the six views
-  PlayerBar, NavRail, TitleBar, InfoPanel, SeekBar, VolumeControl
-  CoverArt, AmbientBackdrop, EqualizerBars, Toast, ResizeGrips
-  NocturneMenu, MenuRow, ConfirmDialog, ChoiceDialog, NameDialog,
-  AddToPlaylistDialog, VaultMoveGuide, ConsentDialog, AppButton,
-  NocturneField, ToggleSwitch, CheckRow, ViewHeader, SectionLabel, InfoRow,
-  EditFieldRow
-  ExternalIdRows.qml    the id fields an enabled plugin declares, in an editor —
-                        drawn from `externalIdFields`, never from a list here
-  TileSizeSlider.qml    how many tiles fit across the artist and album walls;
-                        its stops are column counts, its value is a width
-  DetailHero.qml        the band atop a playlist, an artist or an album — one
-                        component, three pages, and it names no view model
-  EntityChips.qml       chips you pick, not a string you type; ArtistChips and
-                        AlbumChips are it with round and square pictures
-  ChipStack.qml         chips you only read, packed so the pictures overlap and
-                        opening one at a time under the pointer; the prominent
-                        ones draw half again as large
-  ContributorChips.qml  it with an album's artists in it: who is on a record,
-                        in the hero, with anyone over half its tracks drawn big
-  SettingsTabBar.qml    underline tabs with a sliding accent indicator
-  SettingsPane.qml      one settings tab: its scroll surface and its glide
-  ImportButton.qml      split button: import files, or pick another source
-  ImportSources.js      the sources it offers — add one here, and nowhere else
-  ImportOptionsDialog.qml  what a scan found, and what to do about it
-views/                One file per destination
-  NowPlayingView, QueueView, BrowseView, PlaylistsView, LibraryView,
-  SettingsView          the tab bar and the six pages below
-  settings/             AppearanceTab, PlaybackTab, BackingTab,
-                        LibraryTab, SystemTab, AboutTab
-  BackingTrackView, TrackEditView, ImportView   work pages — below
+components/           Reusable pieces, grouped by responsibility
+  artwork/              covers, shared corner masks, ambient background
+  chips/                artist/album pickers and contributor chip stacks
+  controls/             buttons, fields, menus, labels, headers, toast
+  dialogs/              shared prompts, playlists, backup/export, consent, updates
+  editing/              metadata field rows and album split/unify dialogs
+  importing/            import button, legend, options, ImportSources.js
+  library/              collection layouts, cards, heroes, badges, display options
+  playback/             transport, seek/volume, lyrics, meters, focus handle
+  settings/             searchable controls, pane, tab bar, vault move guide
+  shell/                navigation, title bar, sidebars, details, window resizing
+  tracks/               TrackTable, rows, columns, skeletons, TrackColumns.js
+views/                Complete destinations, grouped by feature
+  editing/              AlbumEditView, ArtistEditView, TrackEditView
+  importing/            ImportView
+  library/              LibraryView, BrowseView, PlaylistsView, AlbumView, ArtistView
+  playback/             NowPlayingView, QueueView, BackingTrackView
+  settings/             SettingsView owns category selection and search
+    tabs/                 Appearance, Playback, Backing, Library, Plugins, System, About
 ```
+
+See the [component directory guide](components/README.md) for placement and
+import conventions. `main.qml` composes the shell and destinations; reusable
+components do not import views. The standalone vault setup screen remains in
+`app/vault/VaultSetup.qml`, alongside its startup controller, because it runs
+before a vault or GUI package is available.
 
 `NavRail` follows the sidebar concept in `assets/gui-concept`: Home and listening
 destinations, a Library group with Songs, Albums, Artists and Playlists, Tools

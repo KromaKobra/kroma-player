@@ -226,7 +226,7 @@ def test_the_status_cell_follows_the_queue(qt_app, vm, tmp_path):
             }
         }
         """
-        % (nocturne / "components").as_posix(),
+        % (nocturne / "components" / "tracks").as_posix(),
         encoding="utf-8",
     )
 

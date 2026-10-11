@@ -33,8 +33,8 @@ from PySide6.QtQuick import QQuickItem, QQuickView
 from app.gui.gui_paths import bundled_gui_root
 
 
-# The components folder is imported by absolute URL because the harness is
-# written to a temporary directory: a relative `import "components"` would be
+# The chips folder is imported by absolute URL because the harness is
+# written to a temporary directory: a relative `import "components/chips"` would be
 # resolved against that rather than against the GUI package.
 HARNESS = """
 import QtQuick
@@ -79,7 +79,7 @@ def build(qt_app, tmp_path):
     """
     directory = bundled_gui_root() / "nocturne"
     source = tmp_path / "Harness.qml"
-    source.write_text(HARNESS % QUrl.fromLocalFile(str(directory / "components")).toString())
+    source.write_text(HARNESS % QUrl.fromLocalFile(str(directory / "components" / "chips")).toString())
 
     views = []
 

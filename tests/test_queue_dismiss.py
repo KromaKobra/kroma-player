@@ -506,7 +506,7 @@ def test_the_grip_reads_the_direction_the_hand_went_first():
     from app.gui.gui_paths import bundled_gui_root
 
     source = (
-        bundled_gui_root() / "nocturne" / "components" / "TrackTable.qml"
+        bundled_gui_root() / "nocturne" / "components" / "tracks" / "TrackTable.qml"
     ).read_text()
 
     match = re.search(
@@ -831,7 +831,7 @@ def test_the_queue_keeps_its_protected_row(table):
     assert tbl.property("_minDropRow") == 0, "nothing is playing, so nothing is reserved"
 
     source = (
-        bundled_gui_root() / "nocturne" / "components" / "TrackTable.qml"
+        bundled_gui_root() / "nocturne" / "components" / "tracks" / "TrackTable.qml"
     ).read_text()
     match = re.search(
         r'_minDropRow:\s*\n?\s*\(mode === "queue" && playerVM\.has_current_track\)'
