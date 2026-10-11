@@ -11,9 +11,8 @@ Item {
 
     property bool active: false
 
-    // A tab asked for the backup dialog, which lives on the Library page. The
-    // window owns going there.
-    signal backupRequested()
+    // The window owns one backup dialog and the optional return to an update.
+    signal backupRequested(bool thenUpdate)
 
     readonly property var tabLabels:
         ["Appearance", "Playback", "Backing", "Library", "Plugins", "System", "About"]
@@ -40,7 +39,7 @@ Item {
 
     readonly property bool compact: width < 850
     property var searchResults: []
-    readonly property var categoryHints: ["Theme, colour & motion", "Audio, queue & history", "Instrumentals & models", "Vault & importing", "Extensions & permissions", "Updates & dependencies", "Shortcuts & app details"]
+    readonly property var categoryHints: ["Theme, colour & motion", "Audio, queue & history", "Instrumentals & models", "Vault, backup & importing", "Extensions & permissions", "Updates & dependencies", "Shortcuts & app details"]
     function search(query) {
         var words = query.trim().toLowerCase().split(/\s+/)
         if (!query.trim()) { searchResults = []; return }
@@ -200,6 +199,7 @@ Item {
             currentIndex: root.currentTab
             viewActive: root.active
             onNotify: function (message, isError) { toast.show(message, isError) }
+            onBackupRequested: root.backupRequested(false)
         }
 
         PluginsTab {
@@ -220,7 +220,7 @@ Item {
             currentIndex: root.currentTab
             viewActive: root.active
             onNotify: function (message, isError) { toast.show(message, isError) }
-            onBackupRequested: root.backupRequested()
+            onBackupRequested: root.backupRequested(true)
         }
 
         AboutTab {

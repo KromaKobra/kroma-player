@@ -360,18 +360,8 @@ Window {
                     mainWindow.generateBackingFor(ids)
                 }
                 onEditTrackRequested: function (id) { mainWindow.editTrack(id) }
-                onImportRequested: function (kind) { mainWindow.startImport(kind) }
                 onOpenArtistRequested: function (id) { mainWindow.openArtist(id) }
                 onOpenAlbumRequested: function (id) { mainWindow.openAlbum(id) }
-                // A backup the update dialog sent the user to has finished, or
-                // been put away: the update is still waiting, so bring it back.
-                onBackupClosed: {
-                    if (!mainWindow.updateAfterBackup)
-                        return
-                    mainWindow.updateAfterBackup = false
-                    if (typeof updatesVM !== "undefined" && updatesVM.updateAvailable)
-                        updateDialog.openDialog()
-                }
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
             }
             SettingsView {
@@ -380,7 +370,7 @@ Window {
                 active: mainWindow.viewIndex === 5
                 opacity: active ? 1 : 0
                 visible: opacity > 0
-                onBackupRequested: mainWindow.openBackup(true)
+                onBackupRequested: function (thenUpdate) { mainWindow.openBackup(thenUpdate) }
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
             }
             // Not in the rail. You get here by asking for a backing track that
@@ -746,18 +736,29 @@ Window {
     // ------------------------------------------------------------- an update
 
     // Whether the backup dialog was opened on the way to an update, so closing
-    // it should bring the update back. Set by openBackup(true), cleared by the
-    // Library page's backupClosed.
+    // it should bring the update back. Cleared when the backup dialog closes.
     property bool updateAfterBackup: false
 
-    // The backup dialog, wherever it was asked for. It lives on the Library
-    // page — one instance, so its toasts are not doubled — and this is how
-    // anywhere else reaches it.
+    // One shared dialog keeps Settings and update prompts in their own context.
     function openBackup(thenUpdate) {
         updateAfterBackup = !!thenUpdate
-        go(4)
-        libraryPage.openBackup()
+        backupDialog.openDialog()
     }
+
+    BackupDialog {
+        id: backupDialog
+        objectName: "backupDialog"
+        onNotify: function (message, isError) { backupToast.show(message, isError) }
+        onClosed: {
+            if (!mainWindow.updateAfterBackup)
+                return
+            mainWindow.updateAfterBackup = false
+            if (typeof updatesVM !== "undefined" && updatesVM.updateAvailable)
+                updateDialog.openDialog()
+        }
+    }
+
+    Toast { id: backupToast }
 
     // Told once, with the whole decision in one card: what the release is, the
     // advice to back up first, and a button that downloads, installs and

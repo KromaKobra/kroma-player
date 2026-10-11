@@ -182,13 +182,14 @@ def test_back_up_first_goes_to_the_backup_and_comes_back(gui, vm):
     backup = _find(window, "backupDialog")
     _offer(vm)
     _settle(qt_app)
+    original_view = window.property("viewIndex")
 
     _find(window, "backupFirstButton").clicked.emit()
     _settle(qt_app)
 
     assert backup.property("visible"), "Back up first did not open the backup dialog"
     assert not update.property("visible"), "the update dialog steps aside for it"
-    assert window.property("viewIndex") == 4, "on the Library page, where the backup lives"
+    assert window.property("viewIndex") == original_view, "backup preserves navigation context"
 
     backup.close()
     _settle(qt_app)
@@ -222,11 +223,15 @@ def test_closing_a_backup_opened_for_its_own_sake_brings_nothing_back(gui, vm):
     _find(window, "updateDialog").close()
     _settle(qt_app)
 
-    from PySide6.QtCore import QMetaObject
-
-    # The Library header's own Backup button, which is all openDialog() is.
-    QMetaObject.invokeMethod(backup, "openDialog")
+    # A normal library backup must not reopen an available update afterwards.
+    window.setProperty("viewIndex", 5)
+    _find(window, "settingsView").setProperty("currentTab", 3)
     _settle(qt_app)
+    _find(window, "libraryBackupButton").clicked.emit()
+    _settle(qt_app)
+    assert backup.property("visible")
+    assert window.property("viewIndex") == 5
+    assert not window.property("updateAfterBackup")
     backup.close()
     _settle(qt_app)
 

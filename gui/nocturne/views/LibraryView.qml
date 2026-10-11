@@ -4,11 +4,7 @@ import Kroma.Library 1.0
 import Nocturne
 import "../components"
 
-// The collection itself: what is in it, where it lives, and every track in it.
-//
-// This is the browse-everything page. Search is for finding one thing; this is
-// for looking at the whole library, so the overview rides in the track list's
-// header and scrolls away as soon as you start reading down the rows.
+// The sidebar selects Songs, Artists or Albums over persistent library views.
 Item {
     id: root
 
@@ -18,11 +14,6 @@ Item {
     // Forwarded up to the window, which owns navigation to the hidden pages.
     signal generateBackingRequested(var trackIds)
     signal editTrackRequested(int trackId)
-    // "files", "folder" or "csv" — which source the user picked. The import
-    // page owns the dialogs and the whole run; these buttons are here because
-    // this is where you think of importing, not because the work happens here.
-    signal importRequested(string kind)
-
     // An artist tile was pressed. The window owns navigation to the hidden
     // artist page, exactly as it does for BrowseView's artist rows.
     signal openArtistRequested(int artistId)
@@ -30,17 +21,6 @@ Item {
     // An album tile was pressed. The window owns navigation to the hidden album
     // page, exactly as it does for the artist one.
     signal openAlbumRequested(int albumId)
-
-    // The backup dialog was put away, however it was opened. The window listens
-    // so that a backup taken on the way to an update can hand back to it.
-    signal backupClosed()
-
-    // Open the backup dialog from outside the page — the update dialog's "Back
-    // up first", Settings → System's. This page's instance rather than a second
-    // one: two would each report every finished backup, twice over.
-    function openBackup() {
-        backupDialog.openDialog()
-    }
 
     // Which face is showing. The page has three: the whole track list, every
     // artist as a wall of portraits, and every album as a wall of sleeves. All
@@ -51,16 +31,10 @@ Item {
     readonly property bool albumsMode: Theme.prefs.libraryMode === 2
     readonly property bool gridMode: artistsMode || albumsMode
 
-    // Pushed once, not bound: Pill assigns to its own currentIndex on click and
-    // a binding into it would be destroyed by the first press. Connections
-    // below pushes subsequent sidebar choices into the pill.
-    Component.onCompleted: modePill.currentIndex = Theme.prefs.libraryMode
-
     // Sidebar destinations can switch library faces while this page is active.
     Connections {
         target: Theme.prefs
         function onLibraryModeChanged() {
-            modePill.currentIndex = Theme.prefs.libraryMode
             if (root.active && root.artistsMode)
                 artistsVM.refresh()
             if (root.active && root.albumsMode)
@@ -69,17 +43,11 @@ Item {
     }
 
     onActiveChanged: if (active) {
-        databaseVM.refresh()
         if (artistsMode)
             artistsVM.refresh()
         if (albumsMode)
             albumsVM.refresh()
     }
-
-    // The one thing this page still asks the import model, so a second run
-    // cannot be started on top of one already scanning. Sending the user to a
-    // page that would refuse them is worse than a greyed-out button.
-    readonly property bool importBusy: importVM.isAnalyzing || importVM.isSearching
 
     // ---------------------------------------------------------------- tracks
 
@@ -87,23 +55,9 @@ Item {
     // Search owns its results, and the two would otherwise overwrite each other.
     TrackQuery {
         id: libraryTracks
+        objectName: "libraryTracks"
         sortField: Theme.prefs.librarySort
         sortAscending: Theme.prefs.librarySortAsc
-    }
-
-    readonly property var sortOptions: [
-        { key: "title",       label: "Title" },
-        { key: "artist",      label: "Artist" },
-        { key: "album",       label: "Album" },
-        { key: "stashedDate", label: "Date added" },
-        { key: "duration",    label: "Duration" }
-    ]
-
-    function sortLabel(key) {
-        for (var i = 0; i < sortOptions.length; i++)
-            if (sortOptions[i].key === key)
-                return sortOptions[i].label
-        return sortOptions[0].label
     }
 
     function shuffled(ids) {
@@ -116,147 +70,40 @@ Item {
 
     // ------------------------------------------------------------------ head
 
-    ViewHeader {
+    Item {
         id: header
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        title: "Library"
-        // For tracks: the overview cards say this too, but they scroll away with
-        // the rest of it, and this is what is left once you are down among the
-        // rows. For artists: the vault size is a *file* fact and means nothing on
-        // a page of portraits, so the count of names that look like more than one
-        // artist takes its place — the only thing about the artist list as a
-        // whole that anyone can act on.
-        subtitle: root.artistsMode
-                  ? Fmt.count(artistsVM.count, "artist")
-                    + (artistsVM.needsAttentionCount > 0
-                       ? " · " + artistsVM.needsAttentionCount + " need a look" : "")
-                  : root.albumsMode
-                  // For albums the actionable whole-list fact is how many have
-                  // tracks that disagree about their artwork — the same shape of
-                  // answer the artist face gives, and the only thing about the
-                  // album list as a whole anyone can act on.
-                  ? Fmt.count(albumsVM.count, "album")
-                    + (albumsVM.needsAttentionCount > 0
-                       ? " · " + albumsVM.needsAttentionCount + " need a look" : "")
-                  : Fmt.count(libraryTracks.count, "track")
-                    + " · " + Fmt.mb(databaseVM.vaultMb)
+        height: root.gridMode ? gridHeader.implicitHeight : songsHeader.implicitHeight
 
-        // Which face to show. First in the header so it reads leftmost of the
-        // actions: it changes what the page *is*, where the others act on it.
-        Pill {
-            id: modePill
-            objectName: "libraryModePill"
-            anchors.verticalCenter: parent.verticalCenter
-            options: ["Tracks", "Artists", "Albums"]
-            onSelected: function (index) { Theme.prefs.libraryMode = index }
+        SongsHeader {
+            id: songsHeader
+            objectName: "songsHeader"
+            anchors.fill: parent
+            visible: !root.gridMode
+            songCount: libraryTracks.count
+            totalDuration: libraryTracks.totalDuration
+            onPlayRequested: playerVM.replace_queue_and_play(libraryTracks.trackIds())
+            onShuffleRequested: playerVM.replace_queue_and_play(
+                                    root.shuffled(libraryTracks.trackIds()))
+            onOptionsRequested: sortMenu.popup(optionsAnchor,
+                                               optionsAnchor.width - sortMenu.width,
+                                               optionsAnchor.height + Theme.gapXs)
         }
 
-        // The same control the Import header carries; `importRequested` puts
-        // that page up first and hands the kind straight on to it.
-        ImportButton {
-            anchors.verticalCenter: parent.verticalCenter
-            enabledAction: !root.importBusy
-            onSourceChosen: function (kind) { root.importRequested(kind) }
-        }
-
-        AppButton {
-            anchors.verticalCenter: parent.verticalCenter
-            text: "Backup"
-            iconName: "folder"
-            variant: "ghost"
-            onClicked: backupDialog.openDialog()
-        }
-    }
-
-    // ------------------------------------------------------------- overview
-    //
-    // Rides in the track list's header, so it scrolls up out of the way once
-    // you are looking at tracks rather than at the library as a whole.
-
-    Component {
-        id: overview
-
-        Column {
-            id: overviewColumn
-
-            readonly property real contentWidth: width - Theme.gapXl * 2
-
-            width: libraryTable.width
-            leftPadding: Theme.gapXl
-            rightPadding: Theme.gapXl
-            bottomPadding: Theme.gapSm
-            spacing: Theme.gapLg
-
-            // What you can do with the library, whole. Everything else it used
-            // to say — the counts, the size, where it lives — is either in the
-            // page subtitle or, for the vault, in Settings.
-            Row {
-                spacing: Theme.gapSm
-
-                AppButton {
-                    text: "Play whole library"
-                    iconName: "play"
-                    variant: "filled"
-                    enabledAction: libraryTracks.count > 0
-                    onClicked: playerVM.replace_queue_and_play(libraryTracks.trackIds())
-                }
-                AppButton {
-                    text: "Shuffle whole library"
-                    iconName: "shuffle"
-                    variant: "soft"
-                    enabledAction: libraryTracks.count > 1
-                    onClicked: playerVM.replace_queue_and_play(
-                                   root.shuffled(libraryTracks.trackIds()))
-                }
-            }
-
-            // ------------------------------------------------- list controls
-            Item {
-                width: overviewColumn.contentWidth
-                height: 32
-
-                SectionLabel {
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "ALL TRACKS · " + libraryTracks.count
-                          + (libraryTracks.count > 0
-                             ? " · " + Fmt.longDuration(libraryTracks.totalDuration)
-                             : "")
-                }
-
-                Row {
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: Theme.gapXs
-
-                    AppButton {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "Sort: " + root.sortLabel(Theme.prefs.librarySort)
-                        iconName: "sort"
-                        variant: "ghost"
-                        fontSize: Theme.fzSmall
-                        hPadding: 12
-                        onClicked: sortMenu.popup()
-                    }
-
-                    IconButton {
-                        anchors.verticalCenter: parent.verticalCenter
-                        icon: "chevronDown"
-                        iconSize: 16
-                        diameter: 30
-                        rotation: Theme.prefs.librarySortAsc ? 180 : 0
-                        tooltip: Theme.prefs.librarySortAsc ? "Ascending" : "Descending"
-                        onClicked: Theme.prefs.librarySortAsc = !Theme.prefs.librarySortAsc
-
-                        Behavior on rotation {
-                            NumberAnimation { duration: Theme.normal
-                                              easing.type: Theme.easing }
-                        }
-                    }
-                }
-            }
+        ViewHeader {
+            id: gridHeader
+            anchors.fill: parent
+            visible: root.gridMode
+            title: root.artistsMode ? "Artists" : "Albums"
+            subtitle: root.artistsMode
+                      ? Fmt.count(artistsVM.count, "artist")
+                        + (artistsVM.needsAttentionCount > 0
+                           ? " · " + artistsVM.needsAttentionCount + " need a look" : "")
+                      : Fmt.count(albumsVM.count, "album")
+                        + (albumsVM.needsAttentionCount > 0
+                           ? " · " + albumsVM.needsAttentionCount + " need a look" : "")
         }
     }
 
@@ -271,7 +118,6 @@ Item {
         mode: "library"
         listVM: libraryTracks
         showIndex: true
-        listHeader: overview
         // Not just about painting: TrackTable claims TrackSelection on becoming
         // active, so a table left active behind the grid would keep Escape,
         // Delete and the info panel bound to a list nobody can see.
@@ -329,44 +175,97 @@ Item {
 
     // --------------------------------------------------------------- dialogs
 
-    // Written out rather than repeated over `sortOptions`: a Repeater inside a
+    // Written out rather than generated: a Repeater inside a
     // Menu parents its items to the internal list instead of registering them
     // as entries, so they never appear.
+    ButtonGroup { id: sortFields }
+    ButtonGroup { id: sortDirections }
+
     NocturneMenu {
         id: sortMenu
+        objectName: "songsSortMenu"
+        transformOrigin: Item.TopRight
+        enter: Transition {
+            ParallelAnimation {
+                NumberAnimation { property: "opacity"; from: 0; to: 1
+                                  duration: Theme.prefs.reducedMotion ? 0 : Theme.fast }
+                NumberAnimation { property: "scale"; from: Theme.prefs.reducedMotion ? 1 : 0.96; to: 1
+                                  duration: Theme.prefs.reducedMotion ? 0 : Theme.fast
+                                  easing.type: Theme.easing }
+            }
+        }
+        exit: Transition {
+            NumberAnimation { property: "opacity"; from: 1; to: 0
+                              duration: Theme.prefs.reducedMotion ? 0 : Theme.fast }
+        }
+
+        MenuRow { text: "Sort by"; enabled: false }
+        MenuSeparator {}
 
         MenuRow {
             text: "Title"
-            iconName: Theme.prefs.librarySort === "title" ? "check" : ""
+            objectName: "songsSort_title"
+            ButtonGroup.group: sortFields
+            checkable: true
+            checked: Theme.prefs.librarySort === "title"
+            iconName: checked ? "check" : ""
             onTriggered: Theme.prefs.librarySort = "title"
         }
         MenuRow {
             text: "Artist"
-            iconName: Theme.prefs.librarySort === "artist" ? "check" : ""
+            objectName: "songsSort_artist"
+            ButtonGroup.group: sortFields
+            checkable: true
+            checked: Theme.prefs.librarySort === "artist"
+            iconName: checked ? "check" : ""
             onTriggered: Theme.prefs.librarySort = "artist"
         }
         MenuRow {
             text: "Album"
-            iconName: Theme.prefs.librarySort === "album" ? "check" : ""
+            objectName: "songsSort_album"
+            ButtonGroup.group: sortFields
+            checkable: true
+            checked: Theme.prefs.librarySort === "album"
+            iconName: checked ? "check" : ""
             onTriggered: Theme.prefs.librarySort = "album"
         }
         MenuRow {
             text: "Date added"
-            iconName: Theme.prefs.librarySort === "stashedDate" ? "check" : ""
+            objectName: "songsSort_stashedDate"
+            ButtonGroup.group: sortFields
+            checkable: true
+            checked: Theme.prefs.librarySort === "stashedDate"
+            iconName: checked ? "check" : ""
             onTriggered: Theme.prefs.librarySort = "stashedDate"
         }
         MenuRow {
             text: "Duration"
-            iconName: Theme.prefs.librarySort === "duration" ? "check" : ""
+            objectName: "songsSort_duration"
+            ButtonGroup.group: sortFields
+            checkable: true
+            checked: Theme.prefs.librarySort === "duration"
+            iconName: checked ? "check" : ""
             onTriggered: Theme.prefs.librarySort = "duration"
         }
-    }
-
-    BackupDialog {
-        id: backupDialog
-        objectName: "backupDialog"
-        onNotify: function (message, isError) { toast.show(message, isError) }
-        onClosed: root.backupClosed()
+        MenuSeparator {}
+        MenuRow {
+            objectName: "songsSortAscending"
+            ButtonGroup.group: sortDirections
+            text: "Ascending"
+            checkable: true
+            checked: Theme.prefs.librarySortAsc
+            iconName: checked ? "check" : ""
+            onTriggered: Theme.prefs.librarySortAsc = true
+        }
+        MenuRow {
+            objectName: "songsSortDescending"
+            ButtonGroup.group: sortDirections
+            text: "Descending"
+            checkable: true
+            checked: !Theme.prefs.librarySortAsc
+            iconName: checked ? "check" : ""
+            onTriggered: Theme.prefs.librarySortAsc = false
+        }
     }
 
     Toast { id: toast }

@@ -187,7 +187,7 @@ def test_window_routes_home_library_and_persists_sidebar(application_gui):
         _click(window, _visual_item(rail, "nav_" + label))
         assert window.property("viewIndex") == 4
         assert rail.property("libraryMode") == mode
-        assert window.findChild(QQuickItem, "libraryModePill").property("currentIndex") == mode
+        assert window.findChild(QQuickItem, "songsHeader").isVisible() == (mode == 0)
     QTest.keyClick(window, Qt.Key_B, Qt.ControlModifier)
     qt_app.processEvents()
     assert rail.width() == 64

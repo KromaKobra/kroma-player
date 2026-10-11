@@ -5,7 +5,8 @@ import "../../components"
 SettingsPane {
     id: pane
     title: "Library"
-    description: "Keep your music together and your imports organised."
+    description: "Keep your music together, backed up and organised."
+    signal backupRequested()
     onActiveChanged: if (active && typeof databaseVM !== "undefined") databaseVM.refresh()
     function vaultUrl() {
         var p = String(typeof databaseVM !== "undefined" ? databaseVM.vaultPath : "").replace(/\\/g, "/")
@@ -24,6 +25,17 @@ SettingsPane {
             secondaryText: "Move vault…"
             onRequested: Qt.openUrlExternally(pane.vaultUrl())
             onSecondaryRequested: vaultGuide.open()
+        }
+        SettingRow {
+            width: parent.width
+            label: "Library backup"
+            description: "Back up your vault to another folder. Only changes since the last backup are copied."
+            keywords: "backup back up copy protect restore music database artwork"
+            SettingButton {
+                objectName: "libraryBackupButton"
+                text: "Back up library…"
+                onClicked: pane.backupRequested()
+            }
         }
     }
     SettingsGroup {

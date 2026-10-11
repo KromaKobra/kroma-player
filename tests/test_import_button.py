@@ -1,9 +1,7 @@
 """The import control: one button, one dropdown, one catalog behind both.
 
-Both the Library header and the Import header used to carry the same three
-buttons — files, folder, CSV — declared separately in each view, six blocks for
-what was always one action with alternatives. They are now a single
-``ImportButton`` on each page, whose sources come from ``ImportSources.js`` —
+Import sources are available through one ``ImportButton`` on the Import page,
+whose sources come from ``ImportSources.js`` —
 the built-in ones, plus whatever the enabled plugins contribute, plus CSV once
 something can fetch what a CSV lists.
 
@@ -184,12 +182,12 @@ def _menu_rows(button):
 # ======================================================================
 
 
-def test_each_header_carries_exactly_one_import_control(gui):
-    """Two pages, one control each — and the old six blocks gone from both."""
+def test_import_control_is_available_only_on_the_import_page(gui):
+    """Import stays reachable after removing its shortcut from Songs."""
     window, _, _, _ = gui
 
     buttons = _import_buttons(window)
-    assert len(buttons) == 2, "one on the Library header, one on the Import header"
+    assert len(buttons) == 1, "one import control, on the Import page"
 
     labels = _app_button_labels(window)
     for gone in ("Import files", "Import folder", "Import CSV"):

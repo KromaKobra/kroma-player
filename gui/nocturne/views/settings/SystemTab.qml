@@ -11,8 +11,7 @@ SettingsPane {
 
     readonly property bool hasUpdates: typeof updatesVM !== "undefined"
 
-    // "Back up first". The backup dialog lives on the Library page; the window
-    // takes the user there and brings the update back afterwards.
+    // "Back up first" opens the shared backup dialog and returns to the update.
     signal backupRequested()
 
     // Every program worth checking, as the backend lists them: ffmpeg, which
