@@ -66,10 +66,11 @@ Item {
     width: displayedWidth
     implicitWidth: targetWidth
 
-    Rectangle { anchors.fill: parent; color: Theme.panelBg }
+    SidebarSurface { anchors.fill: parent }
     Rectangle {
         anchors.right: parent.right
-        height: parent.height; width: 1; color: Theme.lineSoft
+        height: parent.height; width: 1
+        color: Theme.prefs.ambient ? Theme.line : Theme.lineSoft
     }
     Button {
         id: toggleButton

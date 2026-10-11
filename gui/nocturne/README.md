@@ -365,6 +365,11 @@ right edge to resize; releasing below 156px snaps to the icon rail. Expanding
 restores the previous expanded width. Width and collapsed state are saved with
 window session state.
 
+With ambient background enabled, both sidebars use `SidebarSurface` to reveal
+the window's shared blurred artwork through a translucent tint and subtle
+reflection. The tint follows light and dark mode and deepens toward the player
+bar to keep labels readable. Turning ambient off restores the solid panel fill.
+
 Both sidebars use `SidebarResizeHandle` for the same frame-synchronized,
 critically damped spring and pointer handling. Retargeting preserves velocity;
 grabbing interrupts at the displayed width and tracks the pointer directly.

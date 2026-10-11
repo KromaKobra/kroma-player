@@ -192,7 +192,7 @@ Window {
     // and never reach here.
     //
     // The three regions that are chrome rather than background — the title bar,
-    // the transport and the details panel — are opaque to the backdrop and
+    // the transport and the details panel — consume background presses and
     // swallow their own strays, each with a sink of its own at the bottom of
     // its stack. The navigation rail deliberately has none: it is background
     // like the rest.

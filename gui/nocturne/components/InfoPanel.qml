@@ -5,7 +5,7 @@ import Nocturne
 // Right-hand details panel driven by sidebarVM, which hands over metadata
 // already formatted for display. It reports its own visibility to the backend
 // so no database or file reads happen while it is closed.
-Rectangle {
+Item {
     id: root
 
     property bool open: false
@@ -13,7 +13,7 @@ Rectangle {
     // Raised by the Edit button. The window owns navigation to the editor.
     signal editRequested(int trackId)
 
-    color: Theme.panelBg
+    SidebarSurface { anchors.fill: parent }
 
     Binding {
         target: typeof sidebarVM !== "undefined" ? sidebarVM : null
@@ -22,7 +22,7 @@ Rectangle {
     }
 
     // Chrome, not background: a press on the panel must not drop the track
-    // selection it is showing. First child, so it is behind the panel's own
+    // selection it is showing. Behind the panel's own
     // content. See the ambient catcher in main.qml.
     MouseArea {
         anchors.fill: parent
@@ -34,7 +34,7 @@ Rectangle {
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         width: 1
-        color: Theme.lineSoft
+        color: Theme.prefs.ambient ? Theme.line : Theme.lineSoft
     }
 
     Flickable {
