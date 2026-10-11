@@ -285,13 +285,6 @@ Window {
             color: Theme.prefs.ambient ? Theme.line : Theme.lineSoft
         }
     }
-    Rectangle {
-        x: nav.width; y: 0
-        width: Math.max(0, mainWindow.width - nav.width - infoPanel.width)
-        height: Theme.titleBarHeight
-        color: Theme.prefs.ambient ? Theme.alpha(Theme.bg, 0.55) : Theme.bg
-    }
-
     // ------------------------------------------------------------------ chrome
 
     TitleBar {
