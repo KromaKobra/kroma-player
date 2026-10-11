@@ -408,7 +408,7 @@ QtObject {
     readonly property int rowHeight:     58
     readonly property int navWidth:      74
     readonly property int playerHeight:  86
-    readonly property int titleBarHeight: 40
+    readonly property int titleBarHeight: 64
 
     // ------------------------------------------------------------ typography
 

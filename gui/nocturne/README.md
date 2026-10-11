@@ -63,13 +63,35 @@ right-click menu acts on the whole selection.
 
 ## Keyboard
 
+The 64-pixel window toolbar contains navigation history, Back, Forward, a
+shared search field, and window controls. Blank space across the whole toolbar,
+including above either sidebar, moves the window through Qt's native system
+move API; double-clicking it toggles maximize. Controls consume their own input.
+Sidebar materials extend to the top edge and reuse the shared artwork blur.
+
+Navigation history remembers up to 60 destinations for the current session,
+including artist/album IDs, track editors, library sections, and search context.
+Back and Forward move through that stack; choosing a new destination after
+going back replaces the forward branch. The history button opens a keyboard
+accessible list anchored to its control. Revisiting an already loaded editor
+preserves staged changes; replacing it with another item asks before discarding.
+
+Search is available from every page. Typing opens Search and library results
+update through its existing debounce; online searches still require Enter.
+Older online queries return as drafts requiring Enter to refresh their results.
+Escape clears text first, then returns focus to the content. Windows uses the
+existing native frameless bridge for shell snapping, minimize, maximize, and
+restore. Linux window controls remain subject to the compositor's policies,
+including tiling window managers; no manual window geometry is used.
+
 | Key | Action |
 |---|---|
 | `Space` | Play / pause |
 | `→` / `←` | Seek ±5 seconds |
 | `Ctrl + →` / `Ctrl + ←` | Next / previous track |
 | `↑` / `↓` | Volume |
-| `Ctrl + F` | Browse |
+| `Ctrl + F` | Focus and select the global search text |
+| `Alt + ←` / `Alt + →` | Previous / next view |
 | `Ctrl + 1`…`6` | Jump to a section |
 | `Ctrl + I` | Toggle the details panel |
 | `Esc` | Close a dialog, clear the search box |

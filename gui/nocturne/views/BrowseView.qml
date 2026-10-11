@@ -13,6 +13,44 @@ Item {
 
     property bool active: false
     property var columnLayouts: null
+    property bool globalSearch: false
+    property alias query: field.text
+    readonly property string searchPlaceholder: root.webMode
+        ? "Search " + root.sourceLabel + " — press Enter"
+        : "Search songs, artists, albums…"
+    property var submittedQueries: ({})
+
+    // Both the standalone page and the window toolbar use this input path.
+    function editQuery(text) {
+        field.text = text
+        if (!root.webMode) debounce.restart()
+    }
+    function submitQuery(text) {
+        field.text = text
+        debounce.stop()
+        if (!root.webMode || text.trim() !== "") {
+            if (root.webMode && !searchVM.isSearching)
+                submittedQueries[searchVM.currentSource] = text.trim()
+            searchVM.text_search(text.trim())
+        }
+    }
+    function restoreQuery(text, source, mode) {
+        var needsRefresh = debounce.running || text !== field.text
+            || source !== searchVM.currentSource || mode !== searchVM.searchMode
+        debounce.stop()
+        field.text = text
+        searchVM.setSource(source || "library")
+        searchVM.searchMode = mode || "best"
+        if (!root.webMode) {
+            if (needsRefresh) root._runLibrary()
+        } else if (!searchVM.isSearching
+            && submittedQueries[searchVM.currentSource] !== text.trim()) {
+            // Keep matching source results cached. An older online query is
+            // restored as a draft: Enter refreshes it, with no automatic I/O
+            // and no newer query's results shown under an older query's text.
+            searchVM.clear_results()
+        }
+    }
 
     readonly property bool webMode: !searchVM.search_in_database
 
@@ -166,10 +204,11 @@ Item {
         anchors.right: parent.right
         anchors.leftMargin: Theme.gapXl
         anchors.rightMargin: Theme.gapXl
-        height: 40
+        height: root.globalSearch && !actions.visible ? 0 : 40
 
         NocturneField {
             id: field
+            visible: !root.globalSearch
             anchors.left: parent.left
             anchors.right: actions.left
             anchors.rightMargin: Theme.gapSm
@@ -179,24 +218,13 @@ Item {
                          ? "Search " + root.sourceLabel + " — press Enter"
                          : "Filter your library…"
 
-            onEdited: function (text) {
-                if (root.webMode)
-                    return
-                debounce.restart()
-            }
-            onAccepted: function (text) {
-                debounce.stop()
-                if (root.webMode) {
-                    if (text.trim() !== "")
-                        searchVM.text_search(text.trim())
-                } else {
-                    root._runLibrary()
-                }
-            }
+            onEdited: function (text) { root.editQuery(text) }
+            onAccepted: function (text) { root.submitQuery(text) }
         }
 
         Row {
             id: actions
+            visible: !root.webMode && root.playableCount > 0
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             spacing: Theme.gapSm

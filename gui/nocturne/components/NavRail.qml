@@ -11,6 +11,7 @@ Item {
     property bool collapsed: false
     property real maximumWidth: 360
     property bool reducedMotion: false
+    property bool drawSurface: true
     property bool showEdit: false
     property bool showArtist: false
     property bool showAlbum: false
@@ -66,8 +67,9 @@ Item {
     width: displayedWidth
     implicitWidth: targetWidth
 
-    SidebarSurface { anchors.fill: parent }
+    SidebarSurface { anchors.fill: parent; visible: root.drawSurface }
     Rectangle {
+        visible: root.drawSurface
         anchors.right: parent.right
         height: parent.height; width: 1
         color: Theme.prefs.ambient ? Theme.line : Theme.lineSoft

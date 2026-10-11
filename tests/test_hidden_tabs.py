@@ -48,6 +48,12 @@ def gui(qt_app, tmp_path_factory):
     from app.bootstrap import create_service_registry
 
     registry = create_service_registry()
+    # Exercise real profile routes. Invalid IDs now stay on the current view,
+    # so an empty database cannot stand in for an artist or album page.
+    from app.models.track import Album, Artist
+    session = registry.get_service("db_session")
+    session.add_all([Artist(name="Test artist"), Album(name="Test album")])
+    session.commit()
     _register_qml_types(registry)
 
     directory = bundled_gui_root() / "nocturne"

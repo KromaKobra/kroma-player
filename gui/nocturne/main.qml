@@ -88,67 +88,11 @@ Window {
         go(6)
     }
 
-    // Open one track in the editor. Single-track by design — every caller has
-    // already established there is exactly one, see TrackTable's Edit entry.
-    function editTrack(id) {
-        if (!id || id <= 0)
-            return
-        editVM.load(id)
-        go(7)
-    }
-
-    // Open one artist's page. The counterpart of editTrack, and reached the same
-    // way: from a search result, from the artist name on a track row, from the
-    // details panel, or from the Library page's artists face. Still not from the
-    // rail — the Library is where you browse the collection, by track or by
-    // artist, and a second top-level destination for the same thing would only
-    // ask the user to remember which one they wanted.
-    function openArtist(id) {
-        if (!id || id <= 0)
-            return
-        artistVM.load(id)
-        artistOpen = true
-        go(9)
-    }
-
-    // Open the artist currently on the artist page for editing. Split out from
-    // openArtist because looking at an artist and correcting one are different
-    // intents, and the second is where the destructive action lives.
-    function editArtist(id) {
-        if (!id || id <= 0)
-            return
-        if (artistVM.artistId !== id)
-            artistVM.load(id)
-        artistOpen = true
-        go(10)
-    }
-
-    // One album, in its running order. Reached from the Library page's albums
-    // face or from something that named the album — never from the rail, for
-    // the same reason the artist page is not: the Library is where you browse
-    // the collection, and a second top-level destination for the same thing
-    // would only ask which one you wanted.
-    //
-    // Two view models to load, not one: `albumVM` is the editor's staged copy
-    // and drives the hero, while `albumTracksVM` holds the running order. They
-    // are separate because one is edited and the other is dragged.
-    function openAlbum(id) {
-        if (!id || id <= 0)
-            return
-        albumVM.load(id)
-        albumTracksVM.load(id)
-        albumOpen = true
-        go(11)
-    }
-
-    function editAlbum(id) {
-        if (!id || id <= 0)
-            return
-        if (albumVM.albumId !== id)
-            albumVM.load(id)
-        albumOpen = true
-        go(12)
-    }
+    function editTrack(id) { if (id > 0) navigate({view: 7, entityId: id}) }
+    function openArtist(id) { if (id > 0) navigate({view: 9, entityId: id}) }
+    function editArtist(id) { if (id > 0) navigate({view: 10, entityId: id}) }
+    function openAlbum(id) { if (id > 0) navigate({view: 11, entityId: id}) }
+    function editAlbum(id) { if (id > 0) navigate({view: 12, entityId: id}) }
 
     // Start an import from a source chosen somewhere else — the Library header
     // is the only such place today. The page is put up first and raises its own
@@ -159,31 +103,122 @@ Window {
         importPage.chooseSource(kind)
     }
 
-    function go(index) {
-        // Going where you already are is not a view change, and must not be
-        // treated as one: the clear below would land with no binding change to
-        // make the page report its selection back.
-        if (index === viewIndex)
-            return
+    NavigationHistory { id: navigationHistory; objectName: "navigationHistory" }
+    readonly property var viewLabels: ["Now Playing", "Queue", "Search", "Playlists",
+        "Library", "Settings", "Backing tracks", "Edit track", "Import", "Artist",
+        "Edit artist", "Album", "Edit album", "Home"]
 
-        if (hiddenViews.indexOf(viewIndex) < 0)
-            previousViewIndex = viewIndex
-
-        // The details panel belongs to whichever view is on screen: what is
-        // selected there wins, and nothing selected there means the playing
-        // track. Only a TrackTable ever reports a selection, so leaving the
-        // old one in place would strand it on a page that has no track list at
-        // all — Now Playing, Settings, the playlist grid — and the panel would
-        // keep showing the last row clicked somewhere else. Clearing here is
-        // what makes "nothing is selected on this page" true by default.
-        //
-        // Views that do have a list re-report theirs from TrackTable's
-        // onActiveChanged, which the assignment below triggers synchronously,
-        // so the panel is never painted in the intervening empty state.
-        sidebarVM.setSelection([])
-        viewIndex = index
-        Theme.prefs.navIndex = index
+    // Capture before loading another entity: all profile/editor views reuse a
+    // single view model. History owns IDs and labels, never those mutable models.
+    function currentRoute() {
+        var route = {view: viewIndex, entityId: 0, label: viewLabels[viewIndex]}
+        if (viewIndex === 4) {
+            route.libraryMode = Theme.prefs.libraryMode
+            route.label = ["Songs", "Artists", "Albums"][route.libraryMode]
+        } else if (viewIndex === 7) {
+            route.entityId = editVM.trackId
+            route.label = "Edit track · " + editVM.title
+        } else if (viewIndex === 9 || viewIndex === 10) {
+            route.entityId = artistVM.artistId
+            route.label += " · " + artistVM.name
+        } else if (viewIndex === 11 || viewIndex === 12) {
+            route.entityId = albumVM.albumId
+            route.label += " · " + albumVM.name
+        } else if (viewIndex === 2) {
+            route.query = browsePage.query
+            route.source = searchVM.currentSource
+            route.mode = searchVM.searchMode
+            if (route.query.trim()) route.label += " · " + route.query.trim()
+        }
+        route.key = route.view + ":" + route.entityId + ":"
+            + (route.libraryMode === undefined ? "" : route.libraryMode)
+        return route
     }
+
+    function go(index) {
+        var route = {view: index}
+        if (index === 7) route.entityId = editVM.trackId
+        if (index === 9 || index === 10) route.entityId = artistVM.artistId
+        if (index === 11 || index === 12) route.entityId = albumVM.albumId
+        navigate(route)
+    }
+    function goLibrary(mode) { navigate({view: 4, libraryMode: mode}) }
+    function visitHistory(index) {
+        if (index < 0 || index >= navigationHistory.entries.length) return
+        navigate(navigationHistory.entries[index], index)
+    }
+
+    function navigate(route, historyIndex, discardApproved) {
+        if (!route || route.view < 0 || route.view >= viewLabels.length) return
+        var entityId = route.entityId || 0
+        var trackChange = route.view === 7 && editVM.trackId !== entityId
+        var artistChange = (route.view === 9 || route.view === 10)
+            && artistVM.artistId !== entityId
+        var albumChange = (route.view === 11 || route.view === 12)
+            && albumVM.albumId !== entityId
+        if (historyIndex === undefined && route.view === viewIndex
+            && !trackChange && !artistChange && !albumChange
+            && (route.libraryMode === undefined || route.libraryMode === Theme.prefs.libraryMode)
+            && route.query === undefined) return
+        if (!discardApproved && ((trackChange && editVM.isDirty)
+            || (artistChange && artistVM.isDirty) || (albumChange && albumVM.isDirty))) {
+            replaceEditor.pendingRoute = route
+            replaceEditor.pendingIndex = historyIndex === undefined ? -1 : historyIndex
+            replaceEditor.open()
+            return
+        }
+        var oldRoute = currentRoute()
+        var oldTrackId = editVM.trackId
+        var oldArtistId = artistVM.artistId
+        var oldAlbumId = albumVM.albumId
+        if (trackChange) editVM.load(entityId)
+        if (artistChange) artistVM.load(entityId)
+        if (albumChange) albumVM.load(entityId)
+        if ((route.view === 7 && !editVM.hasTrack)
+            || ((route.view === 9 || route.view === 10) && !artistVM.hasArtist)
+            || ((route.view === 11 || route.view === 12) && !albumVM.hasAlbum)) {
+            // A removed history item must not empty the profile we were on.
+            if (trackChange && oldTrackId > 0) editVM.load(oldTrackId)
+            if (artistChange && oldArtistId > 0) artistVM.load(oldArtistId)
+            if (albumChange && oldAlbumId > 0) albumVM.load(oldAlbumId)
+            navigationToast.show("This item is no longer in your library", true)
+            return
+        }
+        if (route.view === 9 || route.view === 10) artistOpen = true
+        if (route.view === 11 || route.view === 12) {
+            albumOpen = true
+            if (albumTracksVM.albumId !== entityId) albumTracksVM.load(entityId)
+        }
+        if (route.view === 4 && route.libraryMode !== undefined)
+            Theme.prefs.libraryMode = route.libraryMode
+        if (route.view === 2 && route.query !== undefined)
+            browsePage.restoreQuery(route.query, route.source, route.mode)
+
+        if (route.view !== viewIndex) {
+            if (hiddenViews.indexOf(viewIndex) < 0) previousViewIndex = viewIndex
+            sidebarVM.setSelection([])
+            viewIndex = route.view
+            Theme.prefs.navIndex = viewIndex
+        }
+        navigationHistory.update(oldRoute)
+        if (historyIndex !== undefined && historyIndex >= 0) {
+            navigationHistory.cursor = historyIndex
+            navigationHistory.update(currentRoute())
+        } else navigationHistory.push(currentRoute())
+    }
+
+    ConfirmDialog {
+        id: replaceEditor
+        objectName: "replaceEditorDialog"
+        property var pendingRoute: null
+        property int pendingIndex: -1
+        title: "Discard unsaved edits?"
+        body: "Opening another item replaces the edits staged for the current item."
+        confirmText: "Discard edits"
+        danger: true
+        onConfirmed: mainWindow.navigate(pendingRoute, pendingIndex, true)
+    }
+    Toast { id: navigationToast }
 
     // Typing in a field must not trigger the transport shortcuts, so the
     // single-key bindings live in Keys handlers on the focus scope below rather
@@ -214,6 +249,40 @@ Window {
         onClicked: TrackSelection.clear()
     }
 
+    // One material per sidebar, reaching the top of the window. The controls
+    // below start below the toolbar; the toolbar's drag region remains above.
+    SidebarSurface {
+        objectName: "navigationSurface"
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.bottom: player.top
+        width: nav.width
+        Rectangle {
+            anchors.right: parent.right
+            width: 1; height: parent.height
+            color: Theme.prefs.ambient ? Theme.line : Theme.lineSoft
+        }
+    }
+    SidebarSurface {
+        objectName: "detailsSurface"
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.bottom: player.top
+        width: infoPanel.width
+        visible: width > 0
+        Rectangle {
+            anchors.left: parent.left
+            width: 1; height: parent.height
+            color: Theme.prefs.ambient ? Theme.line : Theme.lineSoft
+        }
+    }
+    Rectangle {
+        x: nav.width; y: 0
+        width: Math.max(0, mainWindow.width - nav.width - infoPanel.width)
+        height: Theme.titleBarHeight
+        color: Theme.prefs.ambient ? Theme.alpha(Theme.bg, 0.55) : Theme.bg
+    }
+
     // ------------------------------------------------------------------ chrome
 
     TitleBar {
@@ -221,9 +290,34 @@ Window {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
+        objectName: "titleBar"
+        z: 10
         targetWindow: mainWindow
-        caption: playerVM.has_current_track
-                 ? "— " + playerVM.current_track_title : ""
+        sidebarWidth: nav.width
+        canGoBack: navigationHistory.canGoBack
+        canGoForward: navigationHistory.canGoForward
+        historyEntries: navigationHistory.entries
+        historyCursor: navigationHistory.cursor
+        searchPlaceholder: browsePage.searchPlaceholder
+        onBackRequested: mainWindow.visitHistory(navigationHistory.cursor - 1)
+        onForwardRequested: mainWindow.visitHistory(navigationHistory.cursor + 1)
+        onHistoryRequested: function (index) { mainWindow.visitHistory(index) }
+        onHistoryOpened: navigationHistory.update(mainWindow.currentRoute())
+        onSearchEdited: function (text) {
+            mainWindow.go(2)
+            browsePage.editQuery(text)
+        }
+        onSearchAccepted: function (text) {
+            mainWindow.go(2)
+            browsePage.submitQuery(text)
+        }
+        onSearchDismissed: content.forceActiveFocus()
+    }
+
+    Binding {
+        target: titleBar
+        property: "searchText"
+        value: browsePage.query
     }
 
     NavRail {
@@ -272,10 +366,8 @@ Window {
                    : (mainWindow.albumOpen || mainWindow.viewIndex === 11
                       ? 11 : 12)
         onNavigated: function (index) { mainWindow.go(index) }
-        onLibraryNavigated: function (mode) {
-            Theme.prefs.libraryMode = mode
-            mainWindow.go(4)
-        }
+        onLibraryNavigated: function (mode) { mainWindow.goLibrary(mode) }
+        drawSurface: false
     }
 
     // ------------------------------------------------------------------ views
@@ -322,6 +414,8 @@ Window {
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
             }
             BrowseView {
+                id: browsePage
+                globalSearch: true
                 anchors.fill: parent
                 columnLayouts: trackColumns
                 active: mainWindow.viewIndex === 2
@@ -577,6 +671,7 @@ Window {
         anchors.bottom: player.top
         width: infoResize.displayedWidth
         open: mainWindow.infoOpen
+        drawSurface: false
         clip: true
         visible: width > 0
         onEditRequested: function (id) { mainWindow.editTrack(id) }
@@ -627,8 +722,10 @@ Window {
 
     Shortcut {
         sequence: "Ctrl+F"
-        onActivated: mainWindow.go(2)
+        onActivated: titleBar.focusSearch()
     }
+    Shortcut { sequence: "Alt+Left"; onActivated: mainWindow.visitHistory(navigationHistory.cursor - 1) }
+    Shortcut { sequence: "Alt+Right"; onActivated: mainWindow.visitHistory(navigationHistory.cursor + 1) }
     Shortcut { sequence: "Ctrl+1"; onActivated: mainWindow.go(0) }
     Shortcut { sequence: "Ctrl+2"; onActivated: mainWindow.go(1) }
     Shortcut { sequence: "Ctrl+3"; onActivated: mainWindow.go(2) }
@@ -807,6 +904,7 @@ Window {
     // ------------------------------------------------------------------ session
 
     Component.onCompleted: {
+        navigationHistory.push(currentRoute())
         if (settingsVM.sessionValue("window.maximized", false))
             showMaximized()
     }

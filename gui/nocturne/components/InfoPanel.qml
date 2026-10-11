@@ -9,11 +9,12 @@ Item {
     id: root
 
     property bool open: false
+    property bool drawSurface: true
 
     // Raised by the Edit button. The window owns navigation to the editor.
     signal editRequested(int trackId)
 
-    SidebarSurface { anchors.fill: parent }
+    SidebarSurface { anchors.fill: parent; visible: root.drawSurface }
 
     Binding {
         target: typeof sidebarVM !== "undefined" ? sidebarVM : null
@@ -30,6 +31,7 @@ Item {
     }
 
     Rectangle {
+        visible: root.drawSurface
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.bottom: parent.bottom

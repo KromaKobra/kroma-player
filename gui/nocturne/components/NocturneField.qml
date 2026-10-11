@@ -9,6 +9,7 @@ Item {
     property alias text: field.text
     property alias placeholder: field.placeholderText
     property string iconName: ""
+    property string accessibleLabel: placeholder
     property bool clearable: true
     property alias inputFocus: field.activeFocus
     property alias cursorPosition: field.cursorPosition
@@ -35,6 +36,7 @@ Item {
         root.edited("")
     }
     function forceFocus() { field.forceActiveFocus() }
+    function selectAll() { field.selectAll() }
 
     Rectangle {
         anchors.fill: parent
@@ -59,6 +61,7 @@ Item {
 
     TextField {
         id: field
+        Accessible.name: root.accessibleLabel
         anchors.fill: parent
         anchors.leftMargin: leading.visible ? 38 : 13
         anchors.rightMargin: clearButton.visible ? 36 : 13
