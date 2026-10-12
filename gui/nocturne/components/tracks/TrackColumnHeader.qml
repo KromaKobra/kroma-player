@@ -60,6 +60,8 @@ Item {
     // the default — leaves every header inert, which is what the queue,
     // playlists and the other lists whose order means something want.
     property var sortDirections: ({})
+    property var titleFields: Catalog.TITLE_SORT_KEYS
+    property string title: ""
     // The sort the owner has chosen, "" for none. Only drawn from here, never
     // written: the click asks, `sortRequested`, and the answer comes back in.
     property string sortField: ""
@@ -78,7 +80,7 @@ Item {
                       : name;
     }
 
-    readonly property var titleSortKeys: Catalog.sortableKeys(Catalog.TITLE_SORT_KEYS,
+    readonly property var titleSortKeys: Catalog.sortableKeys(header.titleFields,
                                                               sortDirections)
     readonly property bool titleSorted: titleSortKeys.indexOf(sortField) !== -1
 
@@ -204,7 +206,7 @@ Item {
             height: parent.height
 
             readonly property bool sortable: header.titleSortKeys.length > 0
-            readonly property string name: header.sortField === "artist" ? "Artist" : "Title"
+            readonly property string name: header.title !== "" ? header.title : header.sortField === "artist" ? "Artist" : "Title"
 
             Accessible.role: Accessible.ColumnHeader
             Accessible.name: header.sortDescription(name, header.titleSorted)

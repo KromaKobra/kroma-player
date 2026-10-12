@@ -9,11 +9,15 @@ LibraryCard {
     required property var trackCount
     required property var totalDuration
 
+    entityId: Number(playlistId)
+    rowIndex: index
+    playing: playerVM.currentSourceType === "playlist" && playerVM.currentSourceId === Number(playlistId)
+    count: Number(trackCount || 0)
+    playable: Number(trackCount) > 0
     objectName: "playlistCell"
     displayTitle: String(name || "")
-    subtitle: Fmt.count(Number(trackCount || 0), "track")
-              + (Number(totalDuration) > 0 ? " · " + Fmt.longDuration(totalDuration) : "")
+    subtitle: !listMode && Number(totalDuration) > 0 ? Fmt.longDuration(totalDuration) : ""
     artworkHash: String(coverHash || "")
-    playable: Number(trackCount) > 0
+    contentTime: Number(totalDuration || 0)
     contextActions: true
 }

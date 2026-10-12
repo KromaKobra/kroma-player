@@ -20,6 +20,8 @@ Item {
     // An artist tile was pressed. The window owns navigation to the hidden
     // artist page, exactly as it does for BrowseView's artist rows.
     signal openArtistRequested(int artistId)
+    signal editArtistRequested(int artistId)
+    signal editAlbumRequested(int albumId)
 
     // An album tile was pressed. The window owns navigation to the hidden album
     // page, exactly as it does for the artist one.
@@ -141,6 +143,7 @@ Item {
         sideMargin: Theme.gapXl
 
         mode: "library"
+        activationAction: "edit"
         gridAvailable: true
         gridMode: Theme.prefs.songGrid
         tileSize: Theme.prefs.songTileSize
@@ -179,6 +182,10 @@ Item {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
 
+        active: root.active && root.artistsMode
+        columnLayout: root.columnLayouts ? root.columnLayouts.artistCollection : null
+        onOpenRequested: function(id, cover) { root.openArtistRequested(id) }
+        onEditRequested: function(id) { root.editArtistRequested(id) }
         viewKey: "artist"
         model: artistsVM
         roundArtwork: true
@@ -205,6 +212,10 @@ Item {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
 
+        active: root.active && root.albumsMode
+        columnLayout: root.columnLayouts ? root.columnLayouts.albumCollection : null
+        onOpenRequested: function(id, cover) { root.openAlbumRequested(id) }
+        onEditRequested: function(id) { root.editAlbumRequested(id) }
         viewKey: "album"
         model: albumsVM
         emptyIcon: "disc"

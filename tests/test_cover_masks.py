@@ -133,6 +133,10 @@ def test_cover_art_only_builds_a_private_mask_when_unshared():
 @pytest.mark.parametrize("group, name", [("library", "LibraryCard.qml"), ("tracks", "SongTile.qml")])
 def test_collection_delegates_consume_view_mask(group, name):
     source = (NOCTURNE / "components" / group / name).read_text()
+    if name == "SongTile.qml":
+        assert re.search(r"LibraryCard\s*\{", source), "song tiles must reuse the shared card"
+        assert not re.search(r"CoverArt\s*\{", source), "song tiles must not duplicate artwork"
+        source = (NOCTURNE / "components" / "library" / "LibraryCard.qml").read_text()
     covers = [source[slice(*_block_at(source, match.end() - 1))]
               for match in re.finditer(r"CoverArt\s*\{", source)]
     assert covers

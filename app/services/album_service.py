@@ -39,6 +39,7 @@ import logging
 from typing import Any, Collection, Dict, Iterable, List, NamedTuple, Optional
 
 from app.events.event_bus import EventBus
+from app.albums.credits import contributing_artists
 from app.models.track import Album
 from app.library.recording_match import DURATION_TOLERANCE_SECONDS, title_key
 from app.repositories.album_repository import DEFAULT_SORT, AlbumRepository
@@ -267,19 +268,10 @@ class AlbumService:
         count the main artists are a *leading run*. A GUI drawing them larger
         never has a big chip appear behind a small one.
         """
-        seen: Dict[int, Dict[str, Any]] = {}
-        for row in self.album_repo.artist_credit_rows(album_id):
-            entry = seen.get(row["artist_id"])
-            if entry is None:
-                seen[row["artist_id"]] = {**row, "track_count": 1}
-            else:
-                entry["track_count"] += 1
-        ordered = list(seen.values())
-        ordered.sort(key=lambda e: e["track_count"], reverse=True)
-        total = self.album_repo.track_count(album_id)
-        for entry in ordered:
-            entry["is_main"] = entry["track_count"] * 2 > total
-        return ordered
+        return contributing_artists(
+            self.album_repo.artist_credit_rows(album_id),
+            self.album_repo.track_count(album_id),
+        )
 
     def visiting_track_ids(self, album_id: int) -> List[int]:
         """Tracks on this album that belong to a different one.

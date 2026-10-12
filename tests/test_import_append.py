@@ -769,6 +769,7 @@ def test_the_list_scrolls_so_the_new_rows_read_as_the_top(qt_app, vm, tmp_path):
         import "{components}/tracks"
 
         Window {{
+            width: 600; height: 400
             visible: true
             property var out: []
             property real rh: table.rowHeight

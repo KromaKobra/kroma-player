@@ -6,6 +6,7 @@ import "../artwork"
 // Layout only. Models and delegates retain ownership of collection behavior.
 GridView {
     id: root
+    property var controller: null
     property int tileSize: 200
     property int artworkPadding: 15
     property int labelHeight: 56
@@ -29,6 +30,8 @@ GridView {
     onColumnsChanged: viewportChanged()
     onCellHeightChanged: viewportChanged()
     onCountChanged: viewportChanged()
+
+    LibrarySelectionBackground { view: root }
 
     // One texture per view, never one mask layer per recycled delegate.
     CornerMask {

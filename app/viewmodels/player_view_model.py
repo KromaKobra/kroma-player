@@ -60,6 +60,7 @@ class PlayerViewModel(QObject):
         self._backing_settings = backing_settings or BackingTrackSettings(None)
 
         self._current_track: Optional[Track] = None
+        self._playback_source: dict = {}
         self._is_playing = False
         self._position   = 0.0
         self._duration   = 0.0
@@ -129,6 +130,17 @@ class PlayerViewModel(QObject):
     def current_track_id(self) -> int:
         """Library id of the playing track, or -1 when nothing is loaded."""
         return cast(int, self._current_track.id) if self._current_track else -1
+
+    @Property(str, notify=current_track_changed)
+    def currentSourceType(self) -> str:
+        return self._current_source().get("sourceType", "")
+
+    @Property(int, notify=current_track_changed)
+    def currentSourceId(self) -> int:
+        return self._current_source().get("sourceId", -1)
+
+    def _current_source(self) -> dict:
+        return self._playback_source if self._current_track is not None else {}
 
     @Property(str, notify=current_track_changed)
     def current_track_cover_hash(self) -> str:
@@ -310,7 +322,12 @@ class PlayerViewModel(QObject):
         The existing queue survives below them; only the header Play/Shuffle
         buttons replace it (``replace_queue_and_play``).
         """
-        entries = self._resolve_entries(track_ids)
+        self.playEntries([{"id": int(t)} for t in track_ids])
+
+    @Slot("QVariantList")
+    def playEntries(self, entries: list) -> None:
+        """Play a block with optional collection provenance, retaining the queue."""
+        entries = self._resolve_entry_data(entries)
         if not entries:
             return
 
@@ -326,7 +343,11 @@ class PlayerViewModel(QObject):
         shuffle-all. History is left untouched. No-op if the list resolves to
         no real tracks.
         """
-        entries = self._resolve_entries(track_ids)
+        self.replaceQueueAndPlayEntries([{"id": int(t)} for t in track_ids])
+
+    @Slot("QVariantList")
+    def replaceQueueAndPlayEntries(self, entries: list) -> None:
+        entries = self._resolve_entry_data(entries)
         if not entries or not self._queue_vm:
             return
 
@@ -345,6 +366,9 @@ class PlayerViewModel(QObject):
         track = self.track_service.get_track_by_id(track_id)
         if track:
             self._current_track = track
+            current = self.queue_manager.current() or {}
+            self._playback_source = {key: current[key] for key in ("sourceType", "sourceId")
+                                     if key in current} if current.get("id") == track_id else {}
             self._duration      = track.duration_seconds
             self._position      = 0.0
             self._listened      = False
@@ -411,11 +435,15 @@ class PlayerViewModel(QObject):
     def _resolve_entries(self, track_ids: list) -> list[dict]:
         """Turn a list of ids into queue entries, dropping ones that no longer
         resolve. One query rather than one per id."""
-        ids = [int(track_id) for track_id in track_ids]
+        return self._resolve_entry_data([{"id": int(t)} for t in track_ids])
+
+    def _resolve_entry_data(self, entries: list) -> list[dict]:
+        ids = [int(entry["id"]) for entry in entries]
         if not ids:
             return []
         existing = {t.id for t in self.track_service.get_tracks_by_ids(ids)}
-        return [{"id": track_id} for track_id in ids if track_id in existing]
+        return [dict(entry, id=track_id) for entry, track_id in zip(entries, ids)
+                if track_id in existing]
 
     def _apply_mutation(self, mutation: QueueMutation) -> None:
         """

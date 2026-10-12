@@ -80,12 +80,18 @@ Item {
     // in here, so reading down the tracks reclaims the space it occupies.
     property Component listHeader: null
 
-    property var selectedIds: new Set()
+    property alias selectedIds: selection.selectedIds
     // uid -> selected (1), joined above (2), joined below (4). Built alongside
     // the sidebar's existing selection walk, only on selection/order changes.
     // Delegates read one cached value; scrolling makes no neighbour queries.
     property var _selectionShapes: ({})
-    property int selectionAnchor: -1
+    property alias selectionAnchor: selection.anchor
+    readonly property var deselectTimer: selection.deselectTimer
+    property string activationAction: "play"
+    property string sourceType: ""
+    property int sourceId: -1
+
+    LibrarySelection { id: selection; model: root.listVM }
     // Snapshots taken at popup time, so a menu item acts on what was selected
     // when it opened rather than on whatever the list looks like by the time
     // it is triggered.
@@ -646,37 +652,8 @@ Item {
 
     // ------------------------------------------------------------- selection
 
-    function _syncFromModel() {
-        deselectTimer.stop()
-        selectionAnchor = -1
-        if (listVM && typeof listVM.selectedUids === "function")
-            selectedIds = new Set(listVM.selectedUids())
-        else
-            selectedIds = new Set()
-    }
-
-    // Re-read a selection the backend changed on its own: a track played
-    // through leaves the queue and loses its selection, and one pulled back out
-    // of history returns as a new instance that was never selected. Without
-    // this the mirror below keeps a uid that no longer exists anywhere, and the
-    // details panel goes on reporting a track that is not selected any more.
-    //
-    // Unlike _syncFromModel this keeps the shift-click anchor unless the row it
-    // names has actually gone, and leaves deselectTimer alone — it re-checks
-    // membership when it fires, for exactly this case.
-    function _resyncSelection() {
-        if (!listVM || typeof listVM.selectedUids !== "function")
-            return
-        var next = new Set(listVM.selectedUids())
-        // Our own writes come back through here. Bailing on an unchanged set
-        // keeps a click from reporting its selection to the sidebar twice.
-        if (next.size === selectedIds.size
-                && Array.from(next).every(function (u) { return selectedIds.has(u) }))
-            return
-        selectedIds = next          // onSelectedIdsChanged -> reportSelection()
-        if (selectionAnchor >= 0 && !next.has(selectionAnchor))
-            selectionAnchor = -1
-    }
+    function _syncFromModel() { selection.sync(true) }
+    function _resyncSelection() { selection.sync(false) }
 
     Connections {
         target: root.listVM
@@ -752,86 +729,21 @@ Item {
             sidebarVM.setSelection(ids)
     }
 
-    function _rowOfUid(uid) {
-        for (var i = 0; i < listVM.rowCount(); i++)
-            if (listVM.uidAt(i) === uid)
-                return i
-        return -1
+    function _rowOfUid(uid) { return selection.rowOf(uid) }
+    function _selectRange(fromUid, toUid) { selection.selectRange(fromUid, toUid) }
+    function handleClick(uid, ctrl, shift) { selection.click(uid, ctrl, shift) }
+    function clearSelection() { selection.clear() }
+    function prepareActivation(uid) { selection.activate(uid) }
+    function activateRow(uid, row, trackId) {
+        selection.activate(uid)
+        if (activationAction === "edit" && trackId > 0) editTrackRequested(trackId)
+        else playRow(row, trackId)
     }
-
-    function _selectRange(fromUid, toUid) {
-        var a = _rowOfUid(fromUid)
-        var b = _rowOfUid(toUid)
-        if (a < 0 || b < 0)
-            return
-        var set = new Set()
-        for (var i = Math.min(a, b); i <= Math.max(a, b); i++)
-            set.add(listVM.uidAt(i))
-        selectedIds = set
-        if (typeof listVM.setSelectedMultiple === "function")
-            listVM.setSelectedMultiple(Array.from(set))
-    }
-
-    // A plain click on the only selected row deselects it — but not straight
-    // away: clicking a row that is already selected and then clicking again is
-    // how you play it, so the deselect holds back long enough for a second
-    // click to arrive and call it off.
-    //
-    // Long enough to sit out an ordinary double click, and no longer. The
-    // platform's interval is the ceiling rather than the value: it is a
-    // generous upper bound — 900ms on this machine — and a row that stays lit
-    // for the better part of a second after you click it reads as broken. The
-    // cap is safe because a double click slower than it is not lost, only
-    // deselected between its two presses and put back on the second; see
-    // rowMouse.onDoubleClicked.
-    //
-    // The size and membership are checked again on the way out because the
-    // selection can change from anywhere — a menu action, the queue moving on —
-    // without anyone thinking to stop a timer.
-    Timer {
-        id: deselectTimer
-        interval: Math.min(Application.styleHints.mouseDoubleClickInterval, 250)
-        property var uid: -1
-        onTriggered: {
-            if (root.selectedIds.size === 1 && root.selectedIds.has(uid))
-                root.clearSelection()
-        }
-    }
-
-    function handleClick(uid, ctrl, shift) {
-        deselectTimer.stop()
-        if (shift && selectionAnchor >= 0) {
-            _selectRange(selectionAnchor, uid)
-        } else if (ctrl) {
-            var set = new Set(selectedIds)
-            if (set.has(uid))
-                set.delete(uid)
-            else
-                set.add(uid)
-            selectedIds = set
-            selectionAnchor = uid
-            if (typeof listVM.setSelectedMultiple === "function")
-                listVM.setSelectedMultiple(Array.from(set))
-        } else if (selectedIds.size === 1 && selectedIds.has(uid)) {
-            // Clicking the one row that is selected: arm the deselect and
-            // change nothing, so the wait is invisible until it pays out.
-            deselectTimer.uid = uid
-            deselectTimer.restart()
-            return
-        } else {
-            selectedIds = new Set([uid])
-            selectionAnchor = uid
-            if (typeof listVM.setSelectedExclusive === "function")
-                listVM.setSelectedExclusive(uid)
-        }
-    }
-
-    function clearSelection() {
-        deselectTimer.stop()
-        selectedIds = new Set()
-        selectionAnchor = -1
-        if (listVM && typeof listVM.clearSelection === "function")
-            listVM.clearSelection()
+    function entriesFor(ids) {
+        return ids.map(function(id) {
+            return root.sourceType !== "" && root.sourceId > 0
+                ? { id: id, sourceType: root.sourceType, sourceId: root.sourceId } : { id: id }
+        })
     }
 
     // --------------------------------------------------------------- actions
@@ -848,7 +760,7 @@ Item {
         if (mode === "queue")
             playerVM.play_queue_rows(rows)
         else if (trackIds.length > 0)
-            playerVM.play_from_ids(trackIds)
+            playerVM.playEntries(root.entriesFor(trackIds))
         rowActivated(rows.length > 0 ? rows[0] : -1,
                      trackIds.length > 0 ? trackIds[0] : -1)
     }
@@ -1144,6 +1056,7 @@ Item {
         // Named so a test can find the row list itself rather than one of the
         // menus, which are ListViews too.
         objectName: "trackList"
+        controller: root
         visible: !root.gridMode
         anchors.fill: parent
         // Docked mode reserves the header's height here instead; sticky mode
@@ -1424,35 +1337,32 @@ Item {
             background: Item {}
         }
 
-        // Clicking anywhere in the list that is not a row drops the selection:
-        // below the last row, above the first, and the strip either side of the
-        // cards, none of which has anything in it to hit.
-        //
-        // It has to sit inside contentItem, and it has to say so: a child
-        // declared here lands beside contentItem rather than in it, and an item
-        // with a negative z is offered the press *after* its own parent — so out
-        // there the Flickable, which accepts every press it is given, would take
-        // the click first and nothing below the rows would ever deselect. In
-        // here the parent is a plain Item that accepts nothing, so the press
-        // falls past the rows to this.
-        //
-        // Which means content coordinates: pinning it to contentY keeps it over
-        // the viewport whatever the rows are doing underneath.
-        MouseArea {
-            parent: list.contentItem
-            x: 0
-            y: list.contentY
-            width: list.width
-            height: list.height
-            z: -1
-            acceptedButtons: Qt.LeftButton
-            onClicked: root.clearSelection()
-        }
-
         delegate: root.gridMode ? null : trackRowDelegate
 
         property Component trackRowDelegate: Item {
             id: rowItem
+            property bool mouseFocus: false
+            onActiveFocusChanged: if (!activeFocus) mouseFocus = false
+            activeFocusOnTab: root.activationAction === "edit" && isTrackRow
+            Accessible.role: Accessible.ListItem
+            Accessible.name: titleText + ", " + artistText
+            Accessible.selected: selected
+            Accessible.onPressAction: root.handleClick(uid, false, false)
+            Keys.onReturnPressed: function(event) {
+                if (root.activationAction === "edit") root.activateRow(uid, index, Number(trackId))
+                else event.accepted = false
+            }
+            Keys.onEnterPressed: function(event) {
+                if (root.activationAction === "edit") root.activateRow(uid, index, Number(trackId))
+                else event.accepted = false
+            }
+            Keys.onSpacePressed: function(event) {
+                mouseFocus = false
+                if (root.activationAction === "edit")
+                    root.handleClick(uid, Boolean(event.modifiers & Qt.ControlModifier), Boolean(event.modifiers & Qt.ShiftModifier))
+                else event.accepted = false
+            }
+            Keys.onMenuPressed: rowItem.openMenu()
 
             required property int index
             required property var uid
@@ -1910,6 +1820,7 @@ Item {
                 // ------------------------------------------------------ backdrop
 
                 Rectangle {
+                    objectName: "entrySelectionBackground"
                     anchors.fill: parent
                     // Interior rows are plain rectangles, including Qt's
                     // automatic antialiasing choice: no rounded geometry.
@@ -1923,7 +1834,8 @@ Item {
                     // impossible to see what is picked. Below that the amber sits
                     // where "transparent" would, and brightens on hover the same
                     // way an ordinary row does.
-                    color: rowItem.selected ? Theme.accentSoft
+                    color: rowItem.selected || rowMouse.pressed ? Theme.accentSoft
+                         : rowItem.activeFocus && !rowItem.mouseFocus ? Theme.alpha(Theme.accent, 0.12)
                          : rowItem.needsAttention
                            ? Theme.alpha(Theme.warning, rowHover.hovered ? 0.22 : 0.14)
                          : (rowHover.hovered ? Theme.alpha(Theme.text, 0.045)
@@ -1936,7 +1848,7 @@ Item {
                     border.color: Theme.alpha(Theme.warning, 0.38)
 
                     Behavior on color {
-                        enabled: !rowItem._settling
+                        enabled: !rowItem._settling && !rowMouse.pressed && !Theme.prefs.reducedMotion
                         ColorAnimation { duration: Theme.fast }
                     }
                 }
@@ -2387,36 +2299,16 @@ Item {
                             }
                         }
 
-                        // Hover overlay turns the artwork into a button — see
-                        // rowItem.artAction for which one, and for the rows that
-                        // get none.
-                        Rectangle {
+                        LibraryPlayButton {
+                            objectName: "songArtworkPlayButton"
                             anchors.fill: rowArt
-                            radius: rowArt.radius
-                            color: Theme.imageScrim
-                            opacity: rowHover.hovered && rowItem.artAction !== "" ? 1 : 0
-                            visible: opacity > 0
-                            Behavior on opacity { NumberAnimation { duration: Theme.fast } }
-
-                            Icon {
-                                anchors.centerIn: parent
-                                name: rowItem.artAction === "external" ? "external" : "play"
-                                size: 16
-                                color: Theme.imageInk
-                            }
-                        }
-
-                        // Fills the artwork rather than the whole slot, so the
-                        // padding either side still selects the row like the rest
-                        // of it does. Disabled on a row with no action, which lets
-                        // the click through to rowMouse below and keeps the click
-                        // doing exactly what the absent glyph promises.
-                        MouseArea {
-                            anchors.fill: rowArt
+                            artworkOverlay: true
+                            artworkRadius: rowArt.radius
+                            displayTitle: rowItem.titleText
+                            iconName: rowItem.artAction === "external" ? "external" : "play"
+                            actionName: rowItem.artAction === "external" ? "Open " : "Play "
                             enabled: rowItem.artAction !== ""
-                            acceptedButtons: Qt.LeftButton
-                            cursorShape: rowItem.artAction !== "" ? Qt.PointingHandCursor
-                                                                  : Qt.ArrowCursor
+                            opacity: enabled && (rowHover.hovered || rowItem.activeFocus || hovered || visualFocus) ? 1 : 0
                             onClicked: rowItem.triggerArtAction()
                         }
                     }
@@ -2560,6 +2452,10 @@ Item {
                             root.albumActivated(Number(rowItem.model.albumId) || -1)
                             return
                         }
+                        if (root.activationAction === "edit") {
+                            rowItem.forceActiveFocus(Qt.MouseFocusReason)
+                            rowItem.mouseFocus = true
+                        }
                         root.handleClick(rowItem.uid,
                                          event.modifiers & Qt.ControlModifier,
                                          event.modifiers & Qt.ShiftModifier)
@@ -2580,7 +2476,7 @@ Item {
                         // Anything written for either here would be unreachable.
                         if (root.webMode && !rowItem.inLibrary)
                             return
-                        root.playRow(rowItem.index, Number(rowItem.trackId) || -1)
+                        root.activateRow(rowItem.uid, rowItem.index, Number(rowItem.trackId) || -1)
                     }
                 }
             }
@@ -2607,6 +2503,7 @@ Item {
         onLoaded: root._pushVisibleRange()
         sourceComponent: LibraryGrid {
             objectName: "songGridView"
+            controller: root
             labelHeight: 62
             delegate: SongTile { table: root }
             tileSize: root.tileSize
@@ -2747,7 +2644,7 @@ Item {
             enabled: root._idsForMenu().length > 0
             // The whole selection, in display order: rows 4 and 8 land in
             // queue slots 1 and 2.
-            onTriggered: queueVM.insertNext(root._idsForMenu())
+            onTriggered: queueVM.insertNextEntries(root.entriesFor(root._idsForMenu()))
         }
 
         MenuRow {
@@ -2756,7 +2653,7 @@ Item {
             visible: root.mode !== "queue"
             height: visible ? implicitHeight : 0
             enabled: root._idsForMenu().length > 0
-            onTriggered: queueVM.append_track_ids(root._idsForMenu())
+            onTriggered: queueVM.appendEntries(root.entriesFor(root._idsForMenu()))
         }
 
         MenuSeparator {

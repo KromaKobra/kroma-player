@@ -413,7 +413,7 @@ def test_playlist_context_and_play_button_keep_their_actions(qt_app, backend, li
     del engine
 
 
-def test_song_tile_keyboard_uses_the_shared_selection_and_playback_controller(qt_app, backend):
+def test_song_tile_keyboard_uses_shared_selection_and_opens_the_editor(qt_app, backend):
     backend.get_service("settings_view_model").setValue("songGrid", True)
     engine, window, warnings = _load(qt_app, backend)
     navigate(window, "song")
@@ -421,12 +421,15 @@ def test_song_tile_keyboard_uses_the_shared_selection_and_playback_controller(qt
     cell = current_cell(window, "song")
     uid, track_id, index = (int(cell.property(name)) for name in ("uid", "trackId", "index"))
     activated = []
-    table.rowActivated.connect(lambda row, track: activated.append((row, track)))
+    table.editTrackRequested.connect(activated.append)
     cell.forceActiveFocus(Qt.TabFocusReason)
     QTest.keyClick(window, Qt.Key_Space)
     assert window.findChild(QObject, "libraryTracks").selectedUids() == [uid]
     QTest.keyClick(window, Qt.Key_Return)
-    assert activated == [(index, track_id)]
+    assert activated == [track_id]
+    assert window.property("viewIndex") == 7
+    navigate(window, "song")
+    cell.forceActiveFocus(Qt.TabFocusReason)
     QTest.keyClick(window, Qt.Key_Menu)
     assert table.property("_menuTrackId") == track_id
     assert table.property("_menuRows") == [index]

@@ -112,6 +112,14 @@ class QueueViewModel(TrackListModel):
         """Append tracks by id to the end of the queue."""
         self._insert(({"id": int(t)} for t in track_ids), index=None)
 
+    @Slot("QVariantList")
+    def insertNextEntries(self, entries: list) -> None:
+        self._insert(entries)
+
+    @Slot("QVariantList")
+    def appendEntries(self, entries: list) -> None:
+        self._insert(entries, index=None)
+
     def _insert(self, entries, index: int = 1) -> None:
         """Insert a block of entries, bracketed in a single row signal pair.
 

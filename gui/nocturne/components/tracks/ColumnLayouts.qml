@@ -22,6 +22,16 @@ QtObject {
 
     property var settings: null
 
+    readonly property TrackColumnLayout artistCollection: TrackColumnLayout {
+        profile: "artistCollection"; settingsKey: "columns.artistCollection"; settings: layouts.settings
+    }
+    readonly property TrackColumnLayout albumCollection: TrackColumnLayout {
+        profile: "albumCollection"; settingsKey: "columns.albumCollection"; settings: layouts.settings
+    }
+    readonly property TrackColumnLayout playlistCollection: TrackColumnLayout {
+        profile: "playlistCollection"; settingsKey: "columns.playlistCollection"; settings: layouts.settings
+    }
+
     // The queue and history are the same rows with the same geometry; only
     // whether the row number shows differs, and that is not part of a layout.
     readonly property TrackColumnLayout queue: TrackColumnLayout {

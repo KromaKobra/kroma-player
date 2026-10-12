@@ -459,6 +459,8 @@ Window {
                     mainWindow.generateBackingFor(ids)
                 }
                 onEditTrackRequested: function (id) { mainWindow.editTrack(id) }
+                onEditArtistRequested: function(id) { mainWindow.editArtist(id) }
+                onEditAlbumRequested: function(id) { mainWindow.editAlbum(id) }
                 onOpenArtistRequested: function (id) { mainWindow.openArtist(id) }
                 onOpenAlbumRequested: function (id) { mainWindow.openAlbum(id) }
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }

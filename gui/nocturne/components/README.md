@@ -44,3 +44,30 @@ existing component bodies, delegates, caches, and shared mask ownership remain
 the same.
 
 See [the settings guide](settings/README.md) when adding controls or settings pages.
+
+Library entries share `LibrarySelection` (click/modifier/range selection),
+`LibrarySelectionBackground` (empty-space deselection in pooled lists and grids),
+`LibraryCard` (list/grid presentation), `LibraryPlayButton` (artwork overlay or
+corner control), and `LibraryCollectionMenu` (selection snapshots and actions).
+`SongTile` and the collection delegates only map roles and navigation signals.
+`LibraryEntityView` owns collection selection, menus and table geometry;
+`LibraryCollectionView` owns the single pooled layout and scroll restoration.
+Collection tables reuse the track column header/catalog/layout with separate
+`artistCollection`, `albumCollection`, and `playlistCollection` preference keys.
+Index, artwork and name remain pinned; data columns can sort, resize, move and hide.
+
+`TrackTable.activationAction` defaults to `"play"`; Songs sets it to `"edit"`.
+Collection detail tables supply `sourceType`/`sourceId` so playback entries retain
+provenance without tying the playing highlight to a loaded detail page.
+
+The collection models expose stable-ID selection (`uidAt`, `selectedUids`,
+`selectedRows`, `setSelectedExclusive`, `setSelectedMultiple`, `clearSelection`)
+and `playbackEntries(entityIds)`, returning `{id, sourceType, sourceId}` in display
+order with overlapping tracks deduplicated. `playerVM.playEntries` preserves the
+queue; `replaceQueueAndPlayEntries` replaces it. `queueVM.insertNextEntries` and
+`appendEntries` preserve source metadata. `currentSourceType`/`currentSourceId`
+describe the loaded track, including while paused; provenance is session-only.
+Album collection roles add `totalDuration`, `primaryArtists`, and `releaseDate`;
+artists add `totalDuration`. Durations are seconds. Primary artists are majority
+contributors, falling back to everyone tied for the largest share; release date
+is temporarily taken from the first track with a known date in album order.

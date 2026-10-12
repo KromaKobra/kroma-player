@@ -62,6 +62,26 @@ var TITLE_SORT_KEYS = ["title", "artist"];
  *              absent = the header does not sort
  */
 var COLUMNS = {
+    trackCount: {
+        key: "trackCount", field: "trackCount", label: "TRACKS",
+        pref: 76, min: 58, max: 0, renderer: "text", align: "right", numeric: true,
+        sortKeys: ["trackCount"]
+    },
+    totalDuration: {
+        key: "totalDuration", field: "totalDuration", label: "TIME",
+        pref: 90, min: 64, max: 0, renderer: "duration", align: "right", numeric: true,
+        sortKeys: ["totalDuration"]
+    },
+    isComplete: {
+        key: "isComplete", field: "isComplete", label: "COMPLETE",
+        pref: 90, min: 72, max: 0, renderer: "complete", align: "centre",
+        sortKeys: ["isComplete"]
+    },
+    releaseDate: {
+        key: "releaseDate", field: "releaseDate", label: "RELEASED",
+        pref: 110, min: 76, max: 0, renderer: "date", align: "left",
+        sortKeys: ["releaseDate"]
+    },
     album: {
         key: "album", field: "album", label: "ALBUM",
         pref: 220, min: 90, max: 0,
@@ -157,6 +177,9 @@ var COLUMNS = {
  * `genres` there would be a permanently blank cell with no error to explain it.
  */
 var PROFILES = {
+    artistCollection: { available: ["trackCount", "totalDuration"], defaults: ["trackCount", "totalDuration"] },
+    albumCollection: { available: ["trackCount", "isComplete", "totalDuration", "releaseDate"], defaults: ["trackCount", "isComplete", "totalDuration", "releaseDate"] },
+    playlistCollection: { available: ["trackCount", "totalDuration"], defaults: ["trackCount", "totalDuration"] },
     queue: {
         available: ["album", "duration", "bpm", "key", "date", "stashedDate", "genres", "isrc"],
         defaults: ["album", "duration"]

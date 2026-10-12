@@ -3,7 +3,7 @@ import QtQuick.Controls
 import Nocturne
 import "../controls"
 
-// Collections have no sortable columns in either their grid or list layout.
+// The same collection sorts are available from grid menus and list headers.
 NocturneMenu {
     id: root
     required property string viewKey
@@ -33,6 +33,33 @@ NocturneMenu {
         text: "Date added"
         iconName: Theme.prefs[root.viewKey + "Sort"] === "dateAdded" ? "check" : ""
         onTriggered: Theme.prefs[root.viewKey + "Sort"] = "dateAdded"
+    }
+    MenuRow {
+        objectName: root.viewKey + "Sort_totalDuration"
+        text: "Total time"
+        iconName: Theme.prefs[root.viewKey + "Sort"] === "totalDuration" ? "check" : ""
+        onTriggered: Theme.prefs[root.viewKey + "Sort"] = "totalDuration"
+    }
+    MenuRow {
+        objectName: root.viewKey + "Sort_primaryArtists"
+        text: "Primary artists"
+        visible: root.viewKey === "album"; height: visible ? implicitHeight : 0
+        iconName: Theme.prefs[root.viewKey + "Sort"] === "primaryArtists" ? "check" : ""
+        onTriggered: Theme.prefs[root.viewKey + "Sort"] = "primaryArtists"
+    }
+    MenuRow {
+        objectName: root.viewKey + "Sort_isComplete"
+        text: "Complete albums"
+        visible: root.viewKey === "album"; height: visible ? implicitHeight : 0
+        iconName: Theme.prefs[root.viewKey + "Sort"] === "isComplete" ? "check" : ""
+        onTriggered: Theme.prefs[root.viewKey + "Sort"] = "isComplete"
+    }
+    MenuRow {
+        objectName: root.viewKey + "Sort_releaseDate"
+        text: "Release date"
+        visible: root.viewKey === "album"; height: visible ? implicitHeight : 0
+        iconName: Theme.prefs[root.viewKey + "Sort"] === "releaseDate" ? "check" : ""
+        onTriggered: Theme.prefs[root.viewKey + "Sort"] = "releaseDate"
     }
     MenuSeparator {}
     MenuRow {

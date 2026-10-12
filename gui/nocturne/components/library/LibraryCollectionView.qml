@@ -6,6 +6,7 @@ import Nocturne
 // tab navigation retains the entire component and its scroll position.
 Item {
     id: root
+    property var controller: null
     required property var model
     required property Component delegate
     property bool listMode: false
@@ -64,6 +65,7 @@ Item {
         id: gridLayout
         LibraryGrid {
             objectName: root.viewObjectName
+            controller: root.controller
             model: root.model
             delegate: root.delegate
             tileSize: root.tileSize
@@ -77,6 +79,7 @@ Item {
         id: listLayout
         LibraryList {
             objectName: root.viewObjectName
+            controller: root.controller
             model: root.model
             delegate: root.delegate
             compact: root.compact

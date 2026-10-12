@@ -150,9 +150,9 @@ Item {
 
         onBackRequested: root.done()
         onContributorClicked: function (id) { root.openArtistRequested(id) }
-        onPlayRequested: playerVM.replace_queue_and_play(albumTracksVM.trackIds())
-        onShuffleRequested: playerVM.replace_queue_and_play(
-                                hero.shuffled(albumTracksVM.trackIds()))
+        onPlayRequested: playerVM.replaceQueueAndPlayEntries(table.entriesFor(albumTracksVM.trackIds()))
+        onShuffleRequested: playerVM.replaceQueueAndPlayEntries(
+                                table.entriesFor(hero.shuffled(albumTracksVM.trackIds())))
         onExportRequested: exportDialog.openForTracks(albumTracksVM.trackIds(), albumVM.name)
         onMenuRequested: albumMenu.popup()
     }
@@ -298,6 +298,8 @@ Item {
 
     TrackTable {
         id: table
+        sourceType: "album"
+        sourceId: root.albumId
         // Named for the tests. Six tables live in the one window and only this
         // one carries `showArt`/`reorderable` off the page's own state, so the
         // artwork and reorder rules have to be read off this table specifically.

@@ -102,6 +102,13 @@ def build(qt_app, tmp_path):
         stack.setProperty("width", width)
         stack.setProperty("entities", entities)
         _settle(qt_app)
+        # The offscreen cursor can start over the enlarged leading face. Establish
+        # the resting state explicitly before measuring or synthesizing hovers.
+        for chip in _chips(stack):
+            area = chip.findChild(QQuickItem, "contributorHover")
+            where = QPointF(-1, -1)
+            QCoreApplication.sendEvent(area, QHoverEvent(QEvent.HoverLeave, where, where, where))
+        _settle(qt_app)
         return stack, warnings
 
     yield make

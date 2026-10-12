@@ -85,9 +85,9 @@ Item {
         menuAlertTooltip: "This name looks like more than one artist"
 
         onBackRequested: root.done()
-        onPlayRequested: playerVM.replace_queue_and_play(artistTracks.trackIds())
-        onShuffleRequested: playerVM.replace_queue_and_play(
-                                hero.shuffled(artistTracks.trackIds()))
+        onPlayRequested: playerVM.replaceQueueAndPlayEntries(table.entriesFor(artistTracks.trackIds()))
+        onShuffleRequested: playerVM.replaceQueueAndPlayEntries(
+                                table.entriesFor(hero.shuffled(artistTracks.trackIds())))
         onMenuRequested: artistMenu.popup()
     }
 
@@ -112,6 +112,8 @@ Item {
 
     TrackTable {
         id: table
+        sourceType: "artist"
+        sourceId: root.artistId
         anchors.top: hero.bottom
         anchors.topMargin: Theme.gapSm
         anchors.left: parent.left

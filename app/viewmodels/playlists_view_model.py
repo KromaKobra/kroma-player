@@ -18,7 +18,6 @@ from enum import IntEnum
 from typing import List
 
 from PySide6.QtCore import (
-    QAbstractListModel,
     QModelIndex,
     Qt,
     Property,
@@ -26,6 +25,7 @@ from PySide6.QtCore import (
     Slot,
 )
 
+from app.viewmodels.collection_list_model import CollectionListModel
 from app.services.playlist_service import PlaylistService
 from app.events.event_bus import EventBus
 
@@ -49,8 +49,10 @@ _ROLE_NAMES: dict[int, bytes] = {
 }
 
 
-class PlaylistsViewModel(QAbstractListModel):
+class PlaylistsViewModel(CollectionListModel):
     """List model exposing every playlist (newest first by default)."""
+
+    entity_kind = "playlist"
 
     # Emitted right after a playlist is created so the UI can open it immediately.
     playlist_created = Signal(int)   # playlist_id
@@ -73,7 +75,7 @@ class PlaylistsViewModel(QAbstractListModel):
             "playlist.reordered",
             # A deleted track cascades out of playlist_tracks at the DB level, so
             # the cached counts/covers must be refreshed too.
-            "track.deleted",
+            "track.deleted", "track.updated",
         ):
             event_bus.subscribe(evt, self._on_playlists_changed)
 
@@ -111,7 +113,7 @@ class PlaylistsViewModel(QAbstractListModel):
         return self._sort_field
 
     def _set_sort_field(self, value: str) -> None:
-        value = value if value in {"name", "trackCount", "dateAdded"} else "dateAdded"
+        value = value if value in {"name", "trackCount", "dateAdded", "totalDuration"} else "dateAdded"
         if value != self._sort_field:
             self._sort_field = value
             self._resort()
@@ -136,14 +138,10 @@ class PlaylistsViewModel(QAbstractListModel):
         self._sort_rows()
 
     def _sort_rows(self) -> None:
-        field = {"name": "name", "trackCount": "track_count", "dateAdded": "created_at"}[self._sort_field]
-
-        def key(row):
-            value = row[field]
-            value = (value or "").casefold() if field == "name" else (value or 0)
-            return value, row["id"]
-
-        self._rows.sort(key=key, reverse=not self._sort_ascending)
+        self._sort_rows_by({
+            "name": "name", "trackCount": "track_count",
+            "dateAdded": "created_at", "totalDuration": "total_duration",
+        })
 
     def _resort(self) -> None:
         self.beginResetModel()

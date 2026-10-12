@@ -24,13 +24,14 @@ from typing import Any, Dict, List, Optional
 
 from PySide6.QtCore import (
     Property,
-    QAbstractListModel,
     QModelIndex,
     Qt,
     Signal,
     Slot,
 )
 
+from app.viewmodels.collection_list_model import CollectionListModel
+from app.repositories.collection_summaries import album_metadata
 from app.events.event_bus import EventBus
 from app.library.context import declared_id_kinds
 from app.library.identity import declared_ids
@@ -50,6 +51,10 @@ class AlbumRoles(IntEnum):
     IsComplete     = Qt.ItemDataRole.UserRole + 7
     IsIdentified   = Qt.ItemDataRole.UserRole + 8
 
+    TotalDuration = Qt.ItemDataRole.UserRole + 9
+    PrimaryArtists = Qt.ItemDataRole.UserRole + 10
+    ReleaseDate = Qt.ItemDataRole.UserRole + 11
+
 
 _ROLE_NAMES: dict[int, bytes] = {
     AlbumRoles.AlbumId:        b"albumId",
@@ -60,11 +65,16 @@ _ROLE_NAMES: dict[int, bytes] = {
     AlbumRoles.NeedsAttention: b"needsAttention",
     AlbumRoles.IsComplete:     b"isComplete",
     AlbumRoles.IsIdentified:   b"isIdentified",
+    AlbumRoles.TotalDuration: b"totalDuration",
+    AlbumRoles.PrimaryArtists: b"primaryArtists",
+    AlbumRoles.ReleaseDate: b"releaseDate",
 }
 
 
-class AlbumsViewModel(QAbstractListModel):
+class AlbumsViewModel(CollectionListModel):
     """List model exposing every album, plus name lookup for the editor."""
+
+    entity_kind = "album"
 
     counts_changed = Signal()
     sort_changed = Signal()
@@ -82,7 +92,7 @@ class AlbumsViewModel(QAbstractListModel):
         self._sort_ascending: bool = False
 
         for evt in (
-            "album.created", "album.updated", "album.deleted",
+            "album.created", "album.updated", "album.deleted", "artist.updated", "artist.deleted",
             # A track changing hands changes album track counts, and a track's
             # artwork changing can make an album's covers agree or stop agreeing
             # without any album row being touched at all.
@@ -122,6 +132,12 @@ class AlbumsViewModel(QAbstractListModel):
             return row["needs_attention"]
         if role == AlbumRoles.IsComplete:
             return row["is_complete"]
+        if role == AlbumRoles.TotalDuration:
+            return row.get("total_duration", 0)
+        if role == AlbumRoles.PrimaryArtists:
+            return row.get("primary_artists", "")
+        if role == AlbumRoles.ReleaseDate:
+            return row.get("release_date", 0)
         return None
 
     def roleNames(self) -> dict[int, bytes]:
@@ -187,6 +203,11 @@ class AlbumsViewModel(QAbstractListModel):
 
     def _reload(self) -> None:
         self._rows = self._service.list_all(self._sort_field, self._sort_ascending)
+        album_metadata(self._service.album_repo.session, self._rows)
+        self._sort_rows_by({
+            "totalDuration": "total_duration", "primaryArtists": "primary_artists",
+            "releaseDate": "release_date", "isComplete": "is_complete",
+        })
 
     def _resort(self) -> None:
         self.beginResetModel()

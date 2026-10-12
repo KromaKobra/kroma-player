@@ -17,9 +17,6 @@ Item {
     signal generateBackingRequested(var trackIds)
     signal editTrackRequested(int trackId)
     property int openId: -1
-    readonly property bool listMode: !Theme.prefs.playlistGrid
-    readonly property bool compact: Theme.prefs.playlistCompact
-    readonly property int tileSize: Math.max(120, Math.min(300, Theme.prefs.playlistTileSize))
 
     // The cover travels with the click. playlistsVM exposes no row accessors,
     // and reading it back by Qt role number would hardcode a private detail.
@@ -71,82 +68,34 @@ Item {
             primaryActionText: "New playlist"
             showSort: true
             onPrimaryActionRequested: createDialog.openBlank()
-            onSortRequested: playlistSort.openFor(sortAnchor)
-            onOptionsRequested: viewOptions.openFor(optionsAnchor)
+            onSortRequested: grid.openSort(sortAnchor)
+            onOptionsRequested: grid.openOptions(optionsAnchor)
         }
-        Binding { target: playlistsVM; property: "sortField"; value: Theme.prefs.playlistSort }
-        Binding { target: playlistsVM; property: "sortAscending"; value: Theme.prefs.playlistSortAsc }
-        CollectionSortMenu {
-            id: playlistSort
-            viewKey: "playlist"
-        }
-        ViewOptionsMenu {
-            id: viewOptions
-            objectName: "playlistViewOptionsMenu"
-            viewKey: "playlist"
-            viewportWidth: grid.width
-            MenuRow {
-                text: "New playlist…"
-                iconName: "plus"
-                onTriggered: createDialog.openBlank()
-            }
-        }
-        LibraryCollectionView {
+        LibraryEntityView {
             id: grid
             anchors.top: gridHeader.bottom
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            anchors.leftMargin: Theme.gapXl
-            anchors.rightMargin: Theme.gapXl
+            anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+            viewKey: "playlist"
             model: playlistsVM
-            viewObjectName: "playlistCollectionView"
-            listMode: root.listMode
-            compact: root.compact
-            tileSize: root.tileSize
-            labelHeight: 54
-            delegate: PlaylistDelegate {
-                onActivated: root.open(Number(playlistId), coverHash)
-                onContextRequested: {
-                    root._armMenu(playlistId, name, coverHash, trackCount, false)
-                    cellMenu.popup()
-                }
-                onPlayRequested: {
-                    playlistTracksVM.load(playlistId)
-                    playAfterLoad.playlistId = playlistId
-                    playAfterLoad.restart()
-                }
+            active: root.active && root.openId < 0
+            columnLayout: root.columnLayouts ? root.columnLayouts.playlistCollection : null
+            allowCreate: true
+            onCreateRequested: createDialog.openBlank()
+            contextMenu: cellMenu
+            onContextRequested: function(entity) {
+                root._armMenu(entity.id, entity.name, entity.coverHash, entity.trackCount, false)
             }
-            LibraryEmptyState {
-                anchors.centerIn: parent
-                visible: grid.count === 0
-                iconName: "playlist"
-                title: "No playlists yet"
-                description: "Group tracks however you like — by mood, by set, by anything."
-                AppButton {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: "Create your first playlist"
-                    iconName: "plus"
-                    variant: "filled"
-                    onClicked: createDialog.openBlank()
-                }
+            delegate: PlaylistDelegate { onActivated: root.open(Number(playlistId), coverHash) }
+            emptyIcon: "playlist"
+            emptyTitle: "No playlists yet"
+            emptyDescription: "Group tracks however you like — by mood, by set, by anything."
+            emptyAction: AppButton {
+                text: "Create your first playlist"; iconName: "plus"; variant: "filled"
+                onClicked: createDialog.openBlank()
             }
         }
-
     }
 
-    // Loading a playlist is synchronous, but the model needs a tick to settle
-    // before its ids can be read back for playback.
-    Timer {
-        id: playAfterLoad
-        property int playlistId: -1
-        interval: 30
-        onTriggered: {
-            var ids = playlistTracksVM.trackIds()
-            if (ids.length > 0)
-                playerVM.replace_queue_and_play(ids)
-        }
-    }
 
     // One menu serves both pages. The grid arms it from the cell under the
     // cursor; the detail page arms it from the playlist it has open, so the two
@@ -168,41 +117,20 @@ Item {
     function _openDetailMenu() {
         _armMenu(openId, playlistTracksVM.playlistName, _openCoverHash,
                  detailTable.count, true)
+        cellMenu.entries = playlistsVM.playbackEntries([openId])
+        cellMenu.selectionCount = 1
+        cellMenu.inDetail = true
         cellMenu.popup()
     }
 
-    NocturneMenu {
+    LibraryCollectionMenu {
         id: cellMenu
-
-        MenuRow {
-            text: "Open"
-            iconName: "chevronRight"
-            // Nothing to open when the menu came from the open playlist itself.
-            visible: !root._menuInDetail
-            height: visible ? implicitHeight : 0
-            onTriggered: root.open(root._menuId, root._menuCover)
-        }
-        MenuRow {
-            text: "Rename…"
-            iconName: "edit"
-            onTriggered: createDialog.openRename(root._menuId, root._menuName)
-        }
-        MenuRow {
-            text: "Export…"
-            iconName: "download"
-            onTriggered: exportDialog.openFor(root._menuId, root._menuName,
-                                              root._menuCount)
-        }
-        MenuSeparator {
-            padding: 0; topPadding: 4; bottomPadding: 4
-            contentItem: Rectangle { implicitHeight: 1; color: Theme.line }
-        }
-        MenuRow {
-            text: "Delete playlist"
-            iconName: "trash"
-            danger: true
-            onTriggered: confirmDeletePlaylist.open()
-        }
+        objectName: "playlistCollectionMenu"
+        playlist: true
+        onOpenRequested: root.open(root._menuId, root._menuCover)
+        onRenameRequested: createDialog.openRename(root._menuId, root._menuName)
+        onExportRequested: exportDialog.openFor(root._menuId, root._menuName, root._menuCount)
+        onDeleteRequested: confirmDeletePlaylist.open()
     }
 
     // ================================================================ detail
@@ -233,9 +161,9 @@ Item {
             backTooltip: "Back to playlists"
 
             onBackRequested: root.back()
-            onPlayRequested: playerVM.replace_queue_and_play(playlistTracksVM.trackIds())
-            onShuffleRequested: playerVM.replace_queue_and_play(
-                                    hero.shuffled(playlistTracksVM.trackIds()))
+            onPlayRequested: playerVM.replaceQueueAndPlayEntries(detailTable.entriesFor(playlistTracksVM.trackIds()))
+            onShuffleRequested: playerVM.replaceQueueAndPlayEntries(
+                                    detailTable.entriesFor(hero.shuffled(playlistTracksVM.trackIds())))
             onExportRequested: exportDialog.openFor(root.openId,
                                                     playlistTracksVM.playlistName,
                                                     detailTable.count)
@@ -252,6 +180,8 @@ Item {
             sideMargin: Theme.gapXl
 
             mode: "playlist"
+            sourceType: "playlist"
+            sourceId: root.openId
             listVM: playlistTracksVM
             active: root.active && root.openId >= 0
             columnLayout: root.columnLayouts ? root.columnLayouts.playlist : null

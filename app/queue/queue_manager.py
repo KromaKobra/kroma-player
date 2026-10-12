@@ -77,7 +77,9 @@ class QueueManager:
              also the back-stack the Previous button pops from.
 
     Both store the same entry shape:
-        { "id": int, "uid": int }
+        { "id": int, "uid": int, "sourceType"?: str, "sourceId"?: int }
+
+    Optional collection provenance travels with the entry across both lists.
 
     All navigation methods return a QueueMutation so the ViewModel layer can
     emit surgical Qt model signals without polling the lists.

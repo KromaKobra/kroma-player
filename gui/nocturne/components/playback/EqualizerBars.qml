@@ -33,7 +33,7 @@ Row {
             height: root.maxHeight * modelData.min
 
             SequentialAnimation on height {
-                running: root.playing
+                running: root.playing && root.visible && !Theme.prefs.reducedMotion
                 loops: Animation.Infinite
                 alwaysRunToEnd: false
 
@@ -60,7 +60,7 @@ Row {
             }
 
             Behavior on height {
-                enabled: !root.playing
+                enabled: !root.playing && !Theme.prefs.reducedMotion
                 NumberAnimation { duration: Theme.normal; easing.type: Theme.easing }
             }
         }

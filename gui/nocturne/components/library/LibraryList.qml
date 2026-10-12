@@ -6,6 +6,7 @@ import "../artwork"
 // The same native, pooled list is also used by TrackTable's specialized rows.
 ListView {
     id: root
+    property var controller: null
     property bool compact: false
     property int rowHeight: compact ? 44 : 68
     property int artworkPadding: 8
@@ -24,6 +25,8 @@ ListView {
     cacheBuffer: rowHeight * 12
     maximumFlickVelocity: 6000
     flickDeceleration: 3000
+
+    LibrarySelectionBackground { view: root }
 
     CornerMask {
         id: sharedMask

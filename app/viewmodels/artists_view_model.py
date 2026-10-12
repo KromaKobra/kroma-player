@@ -23,13 +23,14 @@ from typing import Any, Dict, List, Optional
 
 from PySide6.QtCore import (
     Property,
-    QAbstractListModel,
     QModelIndex,
     Qt,
     Signal,
     Slot,
 )
 
+from app.viewmodels.collection_list_model import CollectionListModel
+from app.repositories.collection_summaries import artist_durations
 from app.events.event_bus import EventBus
 from app.library.context import declared_id_kinds
 from app.library.identity import declared_ids
@@ -47,6 +48,8 @@ class ArtistRoles(IntEnum):
     # Appended, never inserted: these numbers are the model's wire format.
     IsIdentified   = Qt.ItemDataRole.UserRole + 7
 
+    TotalDuration = Qt.ItemDataRole.UserRole + 8
+
 
 _ROLE_NAMES: dict[int, bytes] = {
     ArtistRoles.ArtistId:       b"artistId",
@@ -56,11 +59,14 @@ _ROLE_NAMES: dict[int, bytes] = {
     ArtistRoles.ExternalIds:    b"externalIds",
     ArtistRoles.NeedsAttention: b"needsAttention",
     ArtistRoles.IsIdentified:   b"isIdentified",
+    ArtistRoles.TotalDuration: b"totalDuration",
 }
 
 
-class ArtistsViewModel(QAbstractListModel):
+class ArtistsViewModel(CollectionListModel):
     """List model exposing every artist, plus name lookup for the editor."""
+
+    entity_kind = "artist"
 
     counts_changed = Signal()
     sort_changed = Signal()
@@ -115,6 +121,8 @@ class ArtistsViewModel(QAbstractListModel):
             return bool(declared_ids(row.get("external_ids"), declared_id_kinds(), "artist"))
         if role == ArtistRoles.NeedsAttention:
             return row["needs_attention"]
+        if role == ArtistRoles.TotalDuration:
+            return row.get("total_duration", 0)
         return None
 
     def roleNames(self) -> dict[int, bytes]:
@@ -190,13 +198,15 @@ class ArtistsViewModel(QAbstractListModel):
 
     def _reload(self) -> None:
         self._rows = self._service.list_all(self._sort_field, self._sort_ascending)
+        artist_durations(self._service.artist_repo.session, self._rows)
+        self._sort_rows_by({"totalDuration": "total_duration"})
 
     def _resort(self) -> None:
         """Re-read in the new order.
 
         A full reset rather than a move: the rows are re-queried anyway, and the
-        grid this backs has no selection or scroll anchor that persisting the
-        indices would save.
+        selection remains keyed by entity ID, and the view restores its scroll
+        offset when refreshing.
         """
         self.beginResetModel()
         self._reload()
