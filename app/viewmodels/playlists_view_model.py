@@ -21,6 +21,7 @@ from PySide6.QtCore import (
     QAbstractListModel,
     QModelIndex,
     Qt,
+    Property,
     Signal,
     Slot,
 )
@@ -49,17 +50,20 @@ _ROLE_NAMES: dict[int, bytes] = {
 
 
 class PlaylistsViewModel(QAbstractListModel):
-    """List model exposing every playlist (newest first) plus mutation slots."""
+    """List model exposing every playlist (newest first by default)."""
 
     # Emitted right after a playlist is created so the UI can open it immediately.
     playlist_created = Signal(int)   # playlist_id
     counts_changed   = Signal()      # any add/remove/create/delete (for empty-state)
+    sort_changed = Signal()
 
     def __init__(self, playlist_service: PlaylistService, event_bus: EventBus,
                  parent=None) -> None:
         super().__init__(parent)
         self._service = playlist_service
         self._rows: List[dict] = []
+        self._sort_field = "dateAdded"
+        self._sort_ascending = False
 
         for evt in (
             "playlist.created", "playlist.deleted", "playlist.updated",
@@ -103,12 +107,49 @@ class PlaylistsViewModel(QAbstractListModel):
     def roleNames(self) -> dict[int, bytes]:
         return _ROLE_NAMES
 
+    def _get_sort_field(self) -> str:
+        return self._sort_field
+
+    def _set_sort_field(self, value: str) -> None:
+        value = value if value in {"name", "trackCount", "dateAdded"} else "dateAdded"
+        if value != self._sort_field:
+            self._sort_field = value
+            self._resort()
+
+    def _get_sort_ascending(self) -> bool:
+        return self._sort_ascending
+
+    def _set_sort_ascending(self, value: bool) -> None:
+        if bool(value) != self._sort_ascending:
+            self._sort_ascending = bool(value)
+            self._resort()
+
+    sortField = Property(str, _get_sort_field, _set_sort_field, notify=sort_changed)
+    sortAscending = Property(bool, _get_sort_ascending, _set_sort_ascending, notify=sort_changed)
+
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
 
     def _reload(self) -> None:
         self._rows = self._service.get_summaries()
+        self._sort_rows()
+
+    def _sort_rows(self) -> None:
+        field = {"name": "name", "trackCount": "track_count", "dateAdded": "created_at"}[self._sort_field]
+
+        def key(row):
+            value = row[field]
+            value = (value or "").casefold() if field == "name" else (value or 0)
+            return value, row["id"]
+
+        self._rows.sort(key=key, reverse=not self._sort_ascending)
+
+    def _resort(self) -> None:
+        self.beginResetModel()
+        self._sort_rows()
+        self.endResetModel()
+        self.sort_changed.emit()
 
     def _on_playlists_changed(self, *_args) -> None:
         """Refresh the whole model on any playlist mutation (cheap; few playlists)."""

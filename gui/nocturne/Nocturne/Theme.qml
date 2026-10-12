@@ -87,6 +87,12 @@ QtObject {
         property bool albumSortAsc: SettingsStore.value("albumSortAsc", false)
         onAlbumSortAscChanged: if (root._ready) SettingsStore.setValue("albumSortAsc", albumSortAsc)
 
+        property string playlistSort: SettingsStore.value("playlistSort", "dateAdded")
+        onPlaylistSortChanged: if (root._ready) SettingsStore.setValue("playlistSort", playlistSort)
+
+        property bool playlistSortAsc: SettingsStore.value("playlistSortAsc", false)
+        onPlaylistSortAscChanged: if (root._ready) SettingsStore.setValue("playlistSortAsc", playlistSortAsc)
+
         // How wide a tile on the artist wall wants to be. A target rather than
         // a measurement: the wall fills its row, so the size actually drawn is
         // this rounded to whatever column count fits. Stored as a width rather

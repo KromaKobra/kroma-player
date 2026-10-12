@@ -10,7 +10,7 @@ from test_tile_size import _call, _load, backend  # noqa: F401
 
 
 COLLECTIONS = [
-    ("song", "songsSortMenu", "songGridView", False),
+    ("song", "songsViewOptionsMenu", "songGridView", False),
     ("artist", "artistViewOptionsMenu", "artistCollectionView", True),
     ("album", "albumViewOptionsMenu", "albumCollectionView", True),
     ("playlist", "playlistViewOptionsMenu", "playlistCollectionView", True),
@@ -67,6 +67,79 @@ def seed_playlists(backend):
         vm.createPlaylist(name)
 
 
+@pytest.mark.parametrize("key", ["artist", "album", "playlist"])
+def test_collections_sort_from_their_own_button_in_both_layouts(qt_app, backend, key):
+    seed_playlists(backend)
+    engine, window, warnings = _load(qt_app, backend)
+    navigate(window, key)
+    button = item(window, key + "SortButton")
+    menu = window.findChild(QObject, key + "SortMenu")
+    options = window.findChild(QObject, key + "ViewOptionsMenu")
+    model = backend.get_service(key + "s_view_model")
+    settings = backend.get_service("settings_view_model")
+
+    for grid_mode in (True, False):
+        if options.property("gridMode") is not grid_mode:
+            open_menu(window, key)
+            click(window, item(window, key + "LayoutOption"))
+        assert button.isVisible()
+        for field in ("name", "trackCount", "dateAdded"):
+            button.forceActiveFocus(Qt.TabFocusReason)
+            QTest.keyClick(window, Qt.Key_Space)
+            QTest.qWait(160)
+            assert menu.property("visible")
+            assert not options.property("visible")
+            click(window, item(window, key + "Sort_" + field))
+            assert model.sortField == field
+            assert settings.value(key + "Sort", None) == field
+        for ascending in (True, False):
+            click(window, button)
+            click(window, item(window, key + "Sort" + ("Ascending" if ascending else "Descending")))
+            assert model.sortAscending is ascending
+            assert settings.value(key + "SortAsc", None) is ascending
+        open_menu(window, key)
+        assert options.property("visible")
+        assert not menu.property("visible")
+        assert not options.findChild(QQuickItem, key + "Sort_name")
+        options.close()
+        QTest.qWait(160)
+
+    assert not warnings, [w.toString() for w in warnings]
+    window.close()
+    del engine
+
+
+def test_collection_headers_match_songs_and_fit_narrow_pages(qt_app, backend):
+    seed_playlists(backend)
+    engine, window, warnings = _load(qt_app, backend)
+    song_title = item(window, "songsTitle")
+    song_summary = item(window, "songsSummary")
+    window.setWidth(940)
+    window.setProperty("infoWidth", 380)
+    window.setProperty("infoOpen", True)
+    QTest.qWait(300)
+    for key, title in (("artist", "Artists"), ("album", "Albums"), ("playlist", "Playlists")):
+        navigate(window, key)
+        heading = item(window, key + "Title")
+        summary = item(window, key + "Summary")
+        header = item(window, "playlistHeader" if key == "playlist" else "libraryCollectionHeader")
+        assert heading.property("text") == title
+        assert heading.property("font") == song_title.property("font")
+        assert summary.property("font") == song_summary.property("font")
+        assert summary.property("color") == song_summary.property("color")
+        actions = item(window, key + "Actions")
+        assert header.property("stacked") is (key == "playlist")
+        if header.property("stacked"):
+            assert actions.y() > summary.mapToItem(header, 0, summary.height()).y()
+        else:
+            assert actions.x() > heading.mapToItem(header, heading.width(), 0).x()
+        assert actions.x() + actions.width() <= header.width() - header.property("sideMargin")
+        assert actions.y() + actions.height() < header.property("implicitHeight")
+    assert not warnings, [w.toString() for w in warnings]
+    window.close()
+    del engine
+
+
 @pytest.mark.parametrize("key,menu_name,grid_name,default_grid", COLLECTIONS)
 def test_display_menu_switches_layout_and_density_and_remembers_it(
     qt_app, backend, key, menu_name, grid_name, default_grid
@@ -86,11 +159,9 @@ def test_display_menu_switches_layout_and_density_and_remembers_it(
     layout = item(window, key + "LayoutOption")
     compact = item(window, key + "CompactOption")
     slider = item(window, key + "TileSlider")
-    # Footer order includes the divider and survives arbitrary content above it.
-    # The songs list has none in list view — its column headers sort — so there
-    # the divider goes too, rather than opening the menu on a bare rule.
+    # Only playlists have an action above their display controls.
     separator = menu.property("displaySeparator")
-    if key == "song":
+    if key != "playlist":
         assert not separator.isVisible()
         assert layout.y() >= separator.y()
     else:

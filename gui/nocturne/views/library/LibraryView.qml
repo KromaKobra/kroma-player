@@ -88,7 +88,7 @@ Item {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: root.collectionMode ? gridHeader.implicitHeight : songsHeader.implicitHeight
+        height: root.collectionMode ? collectionHeader.implicitHeight : songsHeader.implicitHeight
 
         SongsHeader {
             id: songsHeader
@@ -100,32 +100,34 @@ Item {
             onPlayRequested: playerVM.replace_queue_and_play(libraryTracks.trackIds())
             onShuffleRequested: playerVM.replace_queue_and_play(
                                     root.shuffled(libraryTracks.trackIds()))
-            onOptionsRequested: sortMenu.popup(optionsAnchor,
-                                               optionsAnchor.width - sortMenu.width,
-                                               optionsAnchor.height + Theme.gapXs)
+            showSort: Theme.prefs.songGrid || !libraryTable.columnLayout
+            onSortRequested: sortMenu.popup(sortAnchor,
+                                            sortAnchor.width - sortMenu.width,
+                                            sortAnchor.height + Theme.gapXs)
+            onOptionsRequested: viewOptions.openFor(optionsAnchor)
         }
 
-        ViewHeader {
-            id: gridHeader
+        LibraryHeader {
+            id: collectionHeader
+            objectName: "libraryCollectionHeader"
             anchors.fill: parent
             visible: root.collectionMode
             title: root.artistsMode ? "Artists" : "Albums"
-            subtitle: root.artistsMode
-                      ? Fmt.count(artistsVM.count, "artist")
-                        + (artistsVM.needsAttentionCount > 0
-                           ? " · " + artistsVM.needsAttentionCount + " need a look" : "")
-                      : Fmt.count(albumsVM.count, "album")
-                        + (albumsVM.needsAttentionCount > 0
-                           ? " · " + albumsVM.needsAttentionCount + " need a look" : "")
-
-            ViewOptionsButton {
-                id: collectionOptions
-                objectName: "libraryCollectionOptionsButton"
-                anchors.verticalCenter: parent.verticalCenter
-                collectionName: root.artistsMode ? "Artist" : "Album"
-                onClicked: root.artistsMode ? artistCollection.openOptions(collectionOptions)
-                                            : albumCollection.openOptions(collectionOptions)
-            }
+            actionPrefix: root.artistsMode ? "artist" : "album"
+            collectionName: root.artistsMode ? "Artist" : "Album"
+            optionsObjectName: "libraryCollectionOptionsButton"
+            showSort: true
+            summary: root.artistsMode
+                     ? Fmt.count(artistsVM.count, "artist")
+                       + (artistsVM.needsAttentionCount > 0
+                          ? " · " + artistsVM.needsAttentionCount + " need a look" : "")
+                     : Fmt.count(albumsVM.count, "album")
+                       + (albumsVM.needsAttentionCount > 0
+                          ? " · " + albumsVM.needsAttentionCount + " need a look" : "")
+            onSortRequested: root.artistsMode ? artistCollection.openSort(sortAnchor)
+                                             : albumCollection.openSort(sortAnchor)
+            onOptionsRequested: root.artistsMode ? artistCollection.openOptions(optionsAnchor)
+                                                : albumCollection.openOptions(optionsAnchor)
         }
     }
 
@@ -179,7 +181,6 @@ Item {
 
         viewKey: "artist"
         model: artistsVM
-        headingText: "ALL ARTISTS · " + artistsVM.count
         roundArtwork: true
         emptyIcon: "person"
         emptyTitle: "No artists yet"
@@ -206,9 +207,6 @@ Item {
 
         viewKey: "album"
         model: albumsVM
-        headingText: "ALL ALBUMS · " + albumsVM.count
-                     + (albumsVM.needsAttentionCount > 0
-                        ? "  ·  " + albumsVM.needsAttentionCount + " need a look" : "")
         emptyIcon: "disc"
         emptyTitle: "No albums yet"
         emptyDescription: "Import or download some music and the records it came from turn up here."
@@ -223,50 +221,33 @@ Item {
 
     // --------------------------------------------------------------- dialogs
 
-    // Written out rather than generated: a Repeater inside a
-    // Menu parents its items to the internal list instead of registering them
-    // as entries, so they never appear.
-    //
-    // Grid view only. In the list the column headers are where sorting lives,
-    // and a second control for the same thing would be one more place to
-    // wonder which of them is in charge. The tiles have no headers, so here it
-    // stays, over the same state the headers read.
+    ViewOptionsMenu {
+        id: viewOptions
+        objectName: "songsViewOptionsMenu"
+        viewKey: "song"
+        viewportWidth: libraryTable.width - 2 * libraryTable.sideMargin
+        leadingSeparator: false
+    }
+
+    // Songs have sortable column headers in list view; tiles use this menu.
+    // Keep explicit menu entries so Qt registers them as actions.
     ButtonGroup { id: sortFields }
     ButtonGroup { id: sortDirections }
 
-    ViewOptionsMenu {
+    NocturneMenu {
         id: sortMenu
         objectName: "songsSortMenu"
-        viewKey: "song"
-        viewportWidth: libraryTable.width - 2 * libraryTable.sideMargin
-        leadingSeparator: Theme.prefs.songGrid
         transformOrigin: Item.TopRight
-        enter: Transition {
-            ParallelAnimation {
-                NumberAnimation { property: "opacity"; from: 0; to: 1
-                                  duration: Theme.prefs.reducedMotion ? 0 : Theme.fast }
-                NumberAnimation { property: "scale"; from: Theme.prefs.reducedMotion ? 1 : 0.96; to: 1
-                                  duration: Theme.prefs.reducedMotion ? 0 : Theme.fast
-                                  easing.type: Theme.easing }
-            }
-        }
-        exit: Transition {
-            NumberAnimation { property: "opacity"; from: 1; to: 0
-                              duration: Theme.prefs.reducedMotion ? 0 : Theme.fast }
-        }
-
         MenuRow {
             text: "Sort by"; enabled: false
-            visible: Theme.prefs.songGrid; height: visible ? implicitHeight : 0
         }
-        MenuSeparator { visible: Theme.prefs.songGrid; height: visible ? implicitHeight : 0 }
+        MenuSeparator {}
 
         MenuRow {
             text: "Title"
             objectName: "songsSort_title"
             ButtonGroup.group: sortFields
             checkable: true
-            visible: Theme.prefs.songGrid; height: visible ? implicitHeight : 0
             checked: root.effectiveSort === "title"
             iconName: checked ? "check" : ""
             onTriggered: root.chooseSort("title", root.effectiveAscending)
@@ -276,7 +257,6 @@ Item {
             objectName: "songsSort_artist"
             ButtonGroup.group: sortFields
             checkable: true
-            visible: Theme.prefs.songGrid; height: visible ? implicitHeight : 0
             checked: root.effectiveSort === "artist"
             iconName: checked ? "check" : ""
             onTriggered: root.chooseSort("artist", root.effectiveAscending)
@@ -286,7 +266,6 @@ Item {
             objectName: "songsSort_album"
             ButtonGroup.group: sortFields
             checkable: true
-            visible: Theme.prefs.songGrid; height: visible ? implicitHeight : 0
             checked: root.effectiveSort === "album"
             iconName: checked ? "check" : ""
             onTriggered: root.chooseSort("album", root.effectiveAscending)
@@ -296,7 +275,6 @@ Item {
             objectName: "songsSort_stashedDate"
             ButtonGroup.group: sortFields
             checkable: true
-            visible: Theme.prefs.songGrid; height: visible ? implicitHeight : 0
             checked: root.effectiveSort === "stashedDate"
             iconName: checked ? "check" : ""
             onTriggered: root.chooseSort("stashedDate", root.effectiveAscending)
@@ -306,18 +284,16 @@ Item {
             objectName: "songsSort_duration"
             ButtonGroup.group: sortFields
             checkable: true
-            visible: Theme.prefs.songGrid; height: visible ? implicitHeight : 0
             checked: root.effectiveSort === "duration"
             iconName: checked ? "check" : ""
             onTriggered: root.chooseSort("duration", root.effectiveAscending)
         }
-        MenuSeparator { visible: Theme.prefs.songGrid; height: visible ? implicitHeight : 0 }
+        MenuSeparator {}
         MenuRow {
             objectName: "songsSortAscending"
             ButtonGroup.group: sortDirections
             text: "Ascending"
             checkable: true
-            visible: Theme.prefs.songGrid; height: visible ? implicitHeight : 0
             checked: root.effectiveAscending
             iconName: checked ? "check" : ""
             onTriggered: root.chooseSort(root.effectiveSort, true)
@@ -327,7 +303,6 @@ Item {
             ButtonGroup.group: sortDirections
             text: "Descending"
             checkable: true
-            visible: Theme.prefs.songGrid; height: visible ? implicitHeight : 0
             checked: !root.effectiveAscending
             iconName: checked ? "check" : ""
             onTriggered: root.chooseSort(root.effectiveSort, false)

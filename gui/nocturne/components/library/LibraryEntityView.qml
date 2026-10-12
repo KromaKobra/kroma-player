@@ -9,7 +9,6 @@ Item {
     required property string viewKey
     required property var model
     required property Component delegate
-    property string headingText: ""
     property string emptyIcon: ""
     property string emptyTitle: ""
     property string emptyDescription: ""
@@ -18,6 +17,7 @@ Item {
     readonly property int count: collection.count
     readonly property int tileSize: Math.max(120, Math.min(300, Theme.prefs[viewKey + "TileSize"]))
     function openOptions(anchor) { options.openFor(anchor) }
+    function openSort(anchor) { sortMenu.openFor(anchor) }
 
     // Navigation refreshes the model to pick up library changes. A reset should
     // not move the user away from the rows they were browsing on this page.
@@ -35,60 +35,20 @@ Item {
     Binding { target: root.model; property: "sortField"; value: Theme.prefs[root.viewKey + "Sort"] }
     Binding { target: root.model; property: "sortAscending"; value: Theme.prefs[root.viewKey + "SortAsc"] }
 
-    Item {
-        id: heading
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.leftMargin: Theme.gapXl
-        anchors.rightMargin: Theme.gapXl
-        height: 32
-        SectionLabel { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: root.headingText }
-    }
-    ButtonGroup { id: directions }
     ViewOptionsMenu {
         id: options
         objectName: root.viewKey + "ViewOptionsMenu"
         viewKey: root.viewKey
         viewportWidth: collection.activeView ? collection.activeView.width : collection.width
-        MenuRow { text: "Sort by"; enabled: false }
-        MenuRow {
-            text: "Most tracks"
-            iconName: Theme.prefs[root.viewKey + "Sort"] === "trackCount" ? "check" : ""
-            onTriggered: Theme.prefs[root.viewKey + "Sort"] = "trackCount"
-        }
-        MenuRow {
-            text: "Name"
-            iconName: Theme.prefs[root.viewKey + "Sort"] === "name" ? "check" : ""
-            onTriggered: Theme.prefs[root.viewKey + "Sort"] = "name"
-        }
-        MenuRow {
-            text: "Date added"
-            iconName: Theme.prefs[root.viewKey + "Sort"] === "dateAdded" ? "check" : ""
-            onTriggered: Theme.prefs[root.viewKey + "Sort"] = "dateAdded"
-        }
-        MenuSeparator {}
-        MenuRow {
-            ButtonGroup.group: directions
-            text: "Ascending"
-            checkable: true
-            checked: Theme.prefs[root.viewKey + "SortAsc"]
-            iconName: checked ? "check" : ""
-            onTriggered: Theme.prefs[root.viewKey + "SortAsc"] = true
-        }
-        MenuRow {
-            ButtonGroup.group: directions
-            text: "Descending"
-            checkable: true
-            checked: !Theme.prefs[root.viewKey + "SortAsc"]
-            iconName: checked ? "check" : ""
-            onTriggered: Theme.prefs[root.viewKey + "SortAsc"] = false
-        }
+        leadingSeparator: false
+    }
+    CollectionSortMenu {
+        id: sortMenu
+        viewKey: root.viewKey
     }
     LibraryCollectionView {
         id: collection
-        anchors.top: heading.bottom
-        anchors.topMargin: Theme.gapSm
+        anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom

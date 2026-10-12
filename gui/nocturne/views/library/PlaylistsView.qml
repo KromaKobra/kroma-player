@@ -56,28 +56,29 @@ Item {
         opacity: root.openId < 0 ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.prefs.reducedMotion ? 0 : Theme.normal } }
 
-        ViewHeader {
+        LibraryHeader {
             id: gridHeader
+            objectName: "playlistHeader"
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
+            height: implicitHeight
             title: "Playlists"
-            subtitle: grid.count > 0 ? Fmt.count(grid.count, "playlist") : "None yet"
-
-            AppButton {
-                anchors.verticalCenter: parent.verticalCenter
-                text: "New playlist"
-                iconName: "plus"
-                variant: "filled"
-                onClicked: createDialog.openBlank()
-            }
-            ViewOptionsButton {
-                id: optionsButton
-                objectName: "playlistViewOptionsButton"
-                anchors.verticalCenter: parent.verticalCenter
-                collectionName: "Playlist"
-                onClicked: viewOptions.openFor(optionsButton)
-            }
+            summary: Fmt.count(grid.count, "playlist")
+            actionPrefix: "playlist"
+            collectionName: "Playlist"
+            optionsObjectName: "playlistViewOptionsButton"
+            primaryActionText: "New playlist"
+            showSort: true
+            onPrimaryActionRequested: createDialog.openBlank()
+            onSortRequested: playlistSort.openFor(sortAnchor)
+            onOptionsRequested: viewOptions.openFor(optionsAnchor)
+        }
+        Binding { target: playlistsVM; property: "sortField"; value: Theme.prefs.playlistSort }
+        Binding { target: playlistsVM; property: "sortAscending"; value: Theme.prefs.playlistSortAsc }
+        CollectionSortMenu {
+            id: playlistSort
+            viewKey: "playlist"
         }
         ViewOptionsMenu {
             id: viewOptions
@@ -89,10 +90,7 @@ Item {
                 iconName: "plus"
                 onTriggered: createDialog.openBlank()
             }
-
         }
-
-
         LibraryCollectionView {
             id: grid
             anchors.top: gridHeader.bottom
@@ -101,7 +99,6 @@ Item {
             anchors.bottom: parent.bottom
             anchors.leftMargin: Theme.gapXl
             anchors.rightMargin: Theme.gapXl
-            anchors.topMargin: Theme.gapSm
             model: playlistsVM
             viewObjectName: "playlistCollectionView"
             listMode: root.listMode

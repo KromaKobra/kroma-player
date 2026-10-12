@@ -27,12 +27,14 @@ Window {
     property int playRequests: 0
     property int shuffleRequests: 0
     property int optionsRequests: 0
+    property int sortRequests: 0
     SongsHeader {
         objectName: "header"
         width: parent.width
         onPlayRequested: window.playRequests++
         onShuffleRequested: window.shuffleRequests++
         onOptionsRequested: window.optionsRequests++
+        onSortRequested: window.sortRequests++
     }
 }
 ''', QUrl.fromLocalFile(str(directory / "songs-header-test.qml")))
@@ -69,8 +71,10 @@ def test_summary_updates_and_empty_library_disables_playback(header):
 def test_all_actions_support_keyboard_activation(header):
     window, item, app = header
     item.setProperty("songCount", 2)
+    item.setProperty("showSort", True)
     for name, counter in [("songsPlayButton", "playRequests"),
                           ("songsShuffleButton", "shuffleRequests"),
+                          ("songsSortButton", "sortRequests"),
                           ("songsMoreButton", "optionsRequests")]:
         button = item.findChild(QQuickItem, name)
         button.forceActiveFocus(Qt.TabFocusReason)
@@ -95,28 +99,27 @@ def test_narrow_header_stacks_actions_without_overlap(header):
     assert not item.property("stacked")
 
 
-def test_more_menu_sorts_only_in_grid_view(application_gui):
-    """In list view the column headers sort, so the menu's sort rows are grid-only.
-
-    Both drive the same state: what the menu checks is what the headers show.
-    """
+def test_dedicated_sort_menu_is_available_without_columns(application_gui):
+    """The sort button and column headers drive the same persisted order."""
     from PySide6.QtCore import QObject, QPointF
 
     window, app = application_gui
     window.findChild(QQuickItem, "navRail").libraryNavigated.emit(0)
     QTest.qWait(250)
     more = window.findChild(QQuickItem, "songsMoreButton")
+    sort_button = window.findChild(QQuickItem, "songsSortButton")
+    options = window.findChild(QObject, "songsViewOptionsMenu")
     menu = window.findChild(QObject, "songsSortMenu")
     table = window.findChild(QQuickItem, "libraryTable")
     query = window.findChild(QObject, "libraryTracks")
     layout = window.findChild(QObject, "songLayoutOption")
-    original_grid = menu.property("gridMode")
+    original_grid = options.property("gridMode")
     original_sort = table.property("sortField")
     original_ascending = table.property("sortAscending")
 
     def open_menu():
         if not menu.property("visible"):
-            more.forceActiveFocus(Qt.TabFocusReason)
+            sort_button.forceActiveFocus(Qt.TabFocusReason)
             QTest.keyClick(window, Qt.Key_Space)
             QTest.qWait(150)
         assert menu.property("visible")
@@ -133,14 +136,22 @@ def test_more_menu_sorts_only_in_grid_view(application_gui):
     try:
         if original_grid:
             layout.triggered.emit()
-        open_menu()
-        for name in ("songsSort_title", "songsSortAscending"):
-            assert not window.findChild(QQuickItem, name).isVisible()
-        menu.close()
-        QTest.qWait(200)   # let the exit transition finish before reopening
+        assert not sort_button.isVisible()
+        more.forceActiveFocus(Qt.TabFocusReason)
+        QTest.keyClick(window, Qt.Key_Space)
+        QTest.qWait(150)
+        assert options.property("visible")
+        assert not menu.property("visible")
+        assert not options.findChild(QQuickItem, "songsSort_title")
+        options.close()
+        QTest.qWait(200)
 
         layout.triggered.emit()
-        assert menu.property("gridMode")
+        QTest.qWait(100)
+        assert options.property("gridMode")
+        assert sort_button.isVisible()
+        shuffle = window.findChild(QQuickItem, "songsShuffleButton")
+        assert shuffle.x() < sort_button.x() < more.x()
         # Nothing chosen yet reads as the default it resolves to.
         table.sortRequested.emit("", False)
         open_menu()
@@ -159,6 +170,7 @@ def test_more_menu_sorts_only_in_grid_view(application_gui):
             assert table.property("sortAscending") == ascending
     finally:
         menu.close()
+        options.close()
         table.sortRequested.emit(original_sort, original_ascending)
-        if menu.property("gridMode") != original_grid:
+        if options.property("gridMode") != original_grid:
             layout.triggered.emit()
