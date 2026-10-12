@@ -142,7 +142,6 @@ Item {
         listMode: !Theme.prefs[root.viewKey + "Grid"]
         compact: Theme.prefs[root.viewKey + "Compact"]
         tileSize: root.tileSize
-        artworkPadding: 17
         artworkRadius: root.artworkRadius
         roundArtwork: root.roundArtwork
         LibraryEmptyState {

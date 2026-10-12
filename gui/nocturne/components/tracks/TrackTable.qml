@@ -2504,7 +2504,7 @@ Item {
         sourceComponent: LibraryGrid {
             objectName: "songGridView"
             controller: root
-            labelHeight: 62
+            labelHeight: 54
             delegate: SongTile { table: root }
             tileSize: root.tileSize
             model: root.gridMode ? root.listVM : null

@@ -52,6 +52,11 @@ corner control), and `LibraryCollectionMenu` (selection snapshots and actions).
 `SongTile` and the collection delegates only map roles and navigation signals.
 `LibraryEntityView` owns collection selection, menus and table geometry;
 `LibraryCollectionView` owns the single pooled layout and scroll restoration.
+Grid artwork uses the shared small spacing token. `LibraryGrid` caches selected
+row positions through one batched model call per selection or structural change;
+`LibraryCard` joins the fill and squares corners along selected physical neighbors.
+Column changes recompute adjacency from the cache, and scrolling performs no
+selection queries. Diagonal entries and entries across row boundaries stay separate.
 Collection tables reuse the track column header/catalog/layout with separate
 `artistCollection`, `albumCollection`, and `playlistCollection` preference keys.
 Index, artwork and name remain pinned; data columns can sort, resize, move and hide.

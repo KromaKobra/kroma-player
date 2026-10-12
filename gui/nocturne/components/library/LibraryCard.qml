@@ -26,6 +26,8 @@ FocusScope {
     property bool contextActions: true
     property bool placeholderGlyph: true
     property bool selected: controller ? controller.selectedIds.has(entityId) : false
+    readonly property int selectionEdges: selected && view && !listMode
+                                         ? view.selectionEdges(rowIndex) : 0
     property bool playing: false
     property bool pooled: false
     property bool mouseFocus: false
@@ -81,8 +83,16 @@ FocusScope {
     Rectangle {
         objectName: "entrySelectionBackground"
         anchors.fill: parent
-        anchors.margins: root.listMode ? 2 : 3
-        radius: Theme.radiusLg
+        anchors.leftMargin: (root.selectionEdges & 1) ? 0 : root.listMode ? 2 : 3
+        anchors.rightMargin: (root.selectionEdges & 2) ? 0 : root.listMode ? 2 : 3
+        anchors.topMargin: (root.selectionEdges & 4) ? 0 : root.listMode ? 2 : 3
+        anchors.bottomMargin: (root.selectionEdges & 8) ? 0 : root.listMode ? 2 : 3
+        radius: (root.selectionEdges & 3) === 3 || (root.selectionEdges & 12) === 12
+                ? 0 : Theme.radiusLg
+        topLeftRadius: (root.selectionEdges & 5) ? 0 : radius
+        topRightRadius: (root.selectionEdges & 6) ? 0 : radius
+        bottomLeftRadius: (root.selectionEdges & 9) ? 0 : radius
+        bottomRightRadius: (root.selectionEdges & 10) ? 0 : radius
         color: root.selected || mouse.pressed ? Theme.accentSoft
                : root.activeFocus && !root.mouseFocus ? Theme.alpha(Theme.accent, 0.12)
                : entryHover.hovered ? Theme.alpha(Theme.text, 0.06) : "transparent"

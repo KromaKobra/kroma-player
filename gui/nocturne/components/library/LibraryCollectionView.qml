@@ -12,8 +12,8 @@ Item {
     property bool listMode: false
     property bool compact: false
     property int tileSize: 200
-    property int artworkPadding: 15
-    property int labelHeight: 56
+    property int artworkPadding: Theme.gapSm
+    property int labelHeight: 48
     property real artworkRadius: Theme.radius
     property bool roundArtwork: false
     property string viewObjectName: ""

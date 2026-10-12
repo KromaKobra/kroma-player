@@ -11,11 +11,17 @@ from app.library.list_model import TrackListModel
 
 class CountingModel(TrackListModel):
     uid_reads = 0
+    selected_rows_reads = 0
 
     @Slot(int, result=int)
     def uidAt(self, row):  # noqa: N802
         self.uid_reads += 1
         return super().uidAt(row)
+
+    @Slot(result="QVariantList")
+    def selectedRows(self):  # noqa: N802
+        self.selected_rows_reads += 1
+        return super().selectedRows()
 
     def insert(self, row, uid):
         self.beginInsertRows(self.index(-1), row, row)
