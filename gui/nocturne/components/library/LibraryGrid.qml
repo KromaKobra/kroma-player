@@ -86,8 +86,8 @@ GridView {
     // One texture per view, never one mask layer per recycled delegate.
     CornerMask {
         id: sharedMask
-        width: root.artSize
-        height: width
+        targetWidth: root.artSize
+        targetHeight: root.artSize
         radius: root.roundArtwork ? width / 2 : root.artworkRadius
     }
     ScrollBar.vertical: ScrollBar { width: 7 }

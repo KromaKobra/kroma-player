@@ -106,11 +106,21 @@ def _load(qt_app, backend):
 
 
 def _wall(qt_app, root, name):
-    """The named grid, switched to the face it lives on the way the Pill does."""
+    """The named grid, switched to the face it lives on the way the Pill does.
+
+    Navigated to rather than forced visible: a hidden page holds the size it
+    last had (see SizeWhileVisible), so a wall measured without being shown
+    reports a width nobody is looking at."""
+    import time
+
     wall = root.findChild(object, name)
     assert wall is not None, f"LibraryView has no {name}"
-    wall.setProperty("visible", True)
-    qt_app.processEvents()
+    assert _call(root, "goLibrary", 1 if name.startswith("artist") else 2)
+    deadline = time.monotonic() + 0.5   # past the cross-fade
+    while time.monotonic() < deadline:
+        qt_app.processEvents()
+        time.sleep(0.01)
+    assert wall.isVisible(), f"{name} did not come on screen"
     return wall
 
 

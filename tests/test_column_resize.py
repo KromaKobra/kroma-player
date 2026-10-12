@@ -127,6 +127,30 @@ def test_the_defaults_are_what_these_tests_assume(layout):
     assert_fits(layout)
 
 
+def test_a_budget_the_title_absorbs_leaves_rendered_widths_alone(layout):
+    """Every visible row binds each cell to `renderedWidths`. A sidebar drag
+    usually moves only the title column, and a fresh object per frame would
+    re-run all of those bindings for the same numbers."""
+    from PySide6.QtCore import QObject, SIGNAL
+
+    before = widths(layout)
+    title_before = title(layout)
+    notified = []
+    QObject.connect(layout, SIGNAL("renderedWidthsChanged()"), lambda: notified.append(1))
+
+    layout.setBudget(BUDGET + 40, GAP)
+    assert title(layout) == title_before + 40
+    assert widths(layout) == before
+    assert notified == [], "renderedWidths was replaced although no width changed"
+    assert_fits(layout)
+
+    # A squeeze that does move a column is still published.
+    layout.setBudget(560, GAP)
+    assert notified, "a real change of width was not published"
+    assert widths(layout) != before
+    assert_fits(layout)
+
+
 def test_a_right_drag_stops_at_its_own_floor_without_pushing(layout):
     """ADDED has 34 to give, and up to there nothing else is disturbed."""
     drag(layout, "stashedDate", 34)

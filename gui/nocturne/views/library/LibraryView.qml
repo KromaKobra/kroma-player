@@ -138,8 +138,6 @@ Item {
         objectName: "libraryTable"
         anchors.top: header.bottom
         anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
         sideMargin: Theme.gapXl
 
         mode: "library"
@@ -169,6 +167,7 @@ Item {
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: Theme.prefs.reducedMotion ? 0 : Theme.normal } }
     }
+    SizeWhileVisible { target: libraryTable; width: root.width; height: root.height - header.height }
 
     // --------------------------------------------------------------- artists
 
@@ -179,8 +178,6 @@ Item {
         objectName: "artistCollection"
         anchors.top: header.bottom
         anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
 
         active: root.active && root.artistsMode
         columnLayout: root.columnLayouts ? root.columnLayouts.artistCollection : null
@@ -200,6 +197,7 @@ Item {
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: Theme.prefs.reducedMotion ? 0 : Theme.normal } }
     }
+    SizeWhileVisible { target: artistCollection; width: root.width; height: root.height - header.height }
 
     // ---------------------------------------------------------------- albums
 
@@ -209,8 +207,6 @@ Item {
         objectName: "albumCollection"
         anchors.top: header.bottom
         anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
 
         active: root.active && root.albumsMode
         columnLayout: root.columnLayouts ? root.columnLayouts.albumCollection : null
@@ -229,6 +225,7 @@ Item {
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: Theme.prefs.reducedMotion ? 0 : Theme.normal } }
     }
+    SizeWhileVisible { target: albumCollection; width: root.width; height: root.height - header.height }
 
     // --------------------------------------------------------------- dialogs
 

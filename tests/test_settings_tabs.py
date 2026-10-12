@@ -38,6 +38,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+SETTINGS_VIEW_INDEX = 5
+
 TAB_OBJECT_NAMES = (
     "appearanceTab",
     "playbackTab",
@@ -263,7 +265,14 @@ def test_search_matches_description_keywords_and_has_an_empty_state(gui):
 def test_narrow_settings_keep_every_category(gui):
     from PySide6.QtCore import QObject
 
+    from PySide6.QtCore import Q_ARG, QMetaObject, Qt
+
     window, app = gui
+    # On screen: a hidden page holds its size (see SizeWhileVisible), so the
+    # narrow layout is only there to inspect once Settings is showing.
+    assert QMetaObject.invokeMethod(
+        window, "go", Qt.DirectConnection, Q_ARG("QVariant", SETTINGS_VIEW_INDEX)
+    )
     original_width = window.width()
     window.setWidth(940)
     _go(window, app, 1)

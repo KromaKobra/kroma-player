@@ -387,27 +387,31 @@ Window {
         focus: true
 
         // Every view stays alive so each keeps its scroll position and state;
-        // only the current one is visible, cross-fading on change.
+        // only the current one is visible, cross-fading on change. Each is sized
+        // by SizeWhileVisible rather than anchored, so a sidebar drag or window
+        // resize relays out the page on screen and not every page behind it.
         Item {
             id: stack
             anchors.fill: parent
 
             Item {
+                id: homePage
                 objectName: "homeView"
-                anchors.fill: parent
                 visible: mainWindow.viewIndex === 13
             }
+            SizeWhileVisible { target: homePage; width: stack.width; height: stack.height }
 
             NowPlayingView {
-                anchors.fill: parent
+                id: nowPlayingPage
                 active: mainWindow.viewIndex === 0
                 opacity: active ? 1 : 0
                 visible: opacity > 0
                 onDetailsRequested: mainWindow.infoOpen = true
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
             }
+            SizeWhileVisible { target: nowPlayingPage; width: stack.width; height: stack.height }
             QueueView {
-                anchors.fill: parent
+                id: queuePage
                 columnLayouts: trackColumns
                 active: mainWindow.viewIndex === 1
                 opacity: active ? 1 : 0
@@ -418,10 +422,10 @@ Window {
                 onEditTrackRequested: function (id) { mainWindow.editTrack(id) }
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
             }
+            SizeWhileVisible { target: queuePage; width: stack.width; height: stack.height }
             BrowseView {
                 id: browsePage
                 globalSearch: true
-                anchors.fill: parent
                 columnLayouts: trackColumns
                 active: mainWindow.viewIndex === 2
                 opacity: active ? 1 : 0
@@ -435,9 +439,10 @@ Window {
                 onOpenAlbumRequested: function (id) { mainWindow.openAlbum(id) }
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
             }
+            SizeWhileVisible { target: browsePage; width: stack.width; height: stack.height }
             PlaylistsView {
+                id: playlistsPage
                 objectName: "playlistsView"
-                anchors.fill: parent
                 columnLayouts: trackColumns
                 active: mainWindow.viewIndex === 3
                 opacity: active ? 1 : 0
@@ -448,9 +453,9 @@ Window {
                 onEditTrackRequested: function (id) { mainWindow.editTrack(id) }
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
             }
+            SizeWhileVisible { target: playlistsPage; width: stack.width; height: stack.height }
             LibraryView {
                 id: libraryPage
-                anchors.fill: parent
                 columnLayouts: trackColumns
                 active: mainWindow.viewIndex === 4
                 opacity: active ? 1 : 0
@@ -465,32 +470,33 @@ Window {
                 onOpenAlbumRequested: function (id) { mainWindow.openAlbum(id) }
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
             }
+            SizeWhileVisible { target: libraryPage; width: stack.width; height: stack.height }
             SettingsView {
                 id: settingsView
-                anchors.fill: parent
                 active: mainWindow.viewIndex === 5
                 opacity: active ? 1 : 0
                 visible: opacity > 0
                 onBackupRequested: function (thenUpdate) { mainWindow.openBackup(thenUpdate) }
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
             }
+            SizeWhileVisible { target: settingsView; width: stack.width; height: stack.height }
             // Not in the rail. You get here by asking for a backing track that
             // does not exist yet — from the transport's mic button or a track's
             // context menu — and not otherwise. It is a workbench for one job,
             // not somewhere to browse to.
             BackingTrackView {
-                anchors.fill: parent
+                id: backingPage
                 active: mainWindow.viewIndex === 6
                 opacity: active ? 1 : 0
                 visible: opacity > 0
                 onDone: mainWindow.go(mainWindow.previousViewIndex)
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
             }
+            SizeWhileVisible { target: backingPage; width: stack.width; height: stack.height }
             // The Tools destination also opens when a source is chosen in the
             // Library header, or a web result is paired with a local file.
             ImportView {
                 id: importPage
-                anchors.fill: parent
                 columnLayouts: trackColumns
                 active: mainWindow.viewIndex === 8
                 opacity: active ? 1 : 0
@@ -498,12 +504,13 @@ Window {
                 onDone: mainWindow.go(mainWindow.previousViewIndex)
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
             }
+            SizeWhileVisible { target: importPage; width: stack.width; height: stack.height }
             // Also not in the rail. You get here by choosing Edit on a single
             // track. Declared last so that when several hidden pages are up it
             // is the editor that paints over the others during the crossfade,
             // matching the order they sit in on the rail.
             TrackEditView {
-                anchors.fill: parent
+                id: trackEditPage
                 active: mainWindow.viewIndex === 7
                 opacity: active ? 1 : 0
                 visible: opacity > 0
@@ -512,12 +519,13 @@ Window {
                 onOpenAlbumRequested: function (id) { mainWindow.openAlbum(id) }
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
             }
+            SizeWhileVisible { target: trackEditPage; width: stack.width; height: stack.height }
             // One artist's catalogue. Not in the rail: you arrive from a search
             // result, a track's artist name, or the details panel — always from
             // something that mentioned the artist.
             ArtistView {
+                id: artistPage
                 objectName: "artistView"
-                anchors.fill: parent
                 columnLayouts: trackColumns
                 active: mainWindow.viewIndex === 9
                 opacity: active ? 1 : 0
@@ -536,14 +544,15 @@ Window {
                 }
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
             }
+            SizeWhileVisible { target: artistPage; width: stack.width; height: stack.height }
             // Declared last, so that with several hidden pages up it is the
             // editor that paints over the others during the crossfade — the same
             // reason TrackEditView sits at the end of the track side.
             // One album's running order. Reached from the albums face of the
             // Library, or from anything that named the album.
             AlbumView {
+                id: albumPage
                 objectName: "albumView"
-                anchors.fill: parent
                 columnLayouts: trackColumns
                 active: mainWindow.viewIndex === 11
                 opacity: active ? 1 : 0
@@ -562,8 +571,9 @@ Window {
                 onImportPageRequested: mainWindow.go(8)
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
             }
+            SizeWhileVisible { target: albumPage; width: stack.width; height: stack.height }
             ArtistEditView {
-                anchors.fill: parent
+                id: artistEditPage
                 active: mainWindow.viewIndex === 10
                 opacity: active ? 1 : 0
                 visible: opacity > 0
@@ -583,11 +593,12 @@ Window {
                 }
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
             }
+            SizeWhileVisible { target: artistEditPage; width: stack.width; height: stack.height }
             // Last of all, for the reason ArtistEditView is second-to-last: with
             // several hidden pages up it should be the editor that paints over
             // the others during the crossfade.
             AlbumEditView {
-                anchors.fill: parent
+                id: albumEditPage
                 active: mainWindow.viewIndex === 12
                 opacity: active ? 1 : 0
                 visible: opacity > 0
@@ -605,6 +616,7 @@ Window {
                 }
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
             }
+            SizeWhileVisible { target: albumEditPage; width: stack.width; height: stack.height }
         }
 
         // Transport keys, and the keyboard half of deselecting. These are on
@@ -703,6 +715,14 @@ Window {
             mainWindow.infoWidth = preferredWidth
             mainWindow.infoOpen = !collapse
         }
+    }
+
+    // Either edge moving, for anything that should hold its size until it
+    // stops rather than rebuild on every frame of the drag.
+    Binding {
+        target: LiveResize
+        property: "active"
+        value: nav.moving || infoResize.dragging || infoResize.animating
     }
 
     // ---------------------------------------------------------------- player

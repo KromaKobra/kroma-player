@@ -358,6 +358,8 @@ Nocturne/             QML module — design tokens and primitives
   Icon, IconButton, Pill, NocturneTooltip
   SmoothWheel.qml       browser-like wheel and trackpad scrolling for a Flickable
   WheelSteps.qml        the same input read as whole steps, for the rail and tabs
+  SizeWhileVisible.qml  page sizing that holds while hidden, so resizes skip it
+  LiveResize.qml        whether a sidebar edge is moving, for size-sensitive layers
 components/           Reusable pieces, grouped by responsibility
   artwork/              covers, shared corner masks, ambient background
   chips/                artist/album pickers and contributor chip stacks

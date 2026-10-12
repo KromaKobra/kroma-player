@@ -93,7 +93,8 @@ Item {
     // allocates the texture, so leaving it off costs nothing when sharing.
     CornerMask {
         id: privateMask
-        anchors.fill: parent
+        targetWidth: root.width
+        targetHeight: root.height
         radius: root.radius
         layer.enabled: root.maskSource === null
     }

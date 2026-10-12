@@ -14,7 +14,8 @@ import "TrackColumns.js" as Catalog
  *
  *   derived     `renderedColumns`, `renderedWidths`, `titleWidth`, `dropped`
  *               — recomputed from the above plus the available width, every
- *                 time either changes, and never written anywhere
+ *                 time either changes, and never written anywhere else
+ *                 (`renderedWidths` keeps its identity while its values hold)
  *
  * Columns must always fit: this list never scrolls sideways and never clips.
  * So when the window shrinks, widths shrink, and when even the minimums will
@@ -88,8 +89,26 @@ QtObject {
         return out;
     }
 
-    readonly property var renderedWidths: _fit().widths
-    readonly property real titleWidth: _fit().titleWidth
+    // Fitted once per change, and both halves read from the one result.
+    readonly property var _fitted: _fit()
+    readonly property real titleWidth: _fitted.titleWidth
+
+    /* Replaced only when a width in it actually changes. A sidebar drag or a
+     * window resize usually moves the title column alone, and every visible
+     * row binds each of its cells to this object: handing out a fresh one per
+     * frame would re-run all of those bindings to arrive at the same numbers.
+     * Seeded from the fit so it is complete for whatever binds to it while the
+     * window is still being built; the first refit takes it over for good.
+     */
+    property var renderedWidths: _fitted.widths
+    property bool _widthsOwned: false
+    on_FittedChanged: {
+        var next = _fitted.widths;
+        if (_widthsOwned && _sameWidths(renderedWidths, next))
+            return;
+        _widthsOwned = true;
+        renderedWidths = next;
+    }
 
     /* The right-click menu: every column this profile offers, and whether it is
      * currently on. Order is the catalog's declaration order, not the user's —
@@ -225,6 +244,16 @@ QtObject {
 
         return { widths: w, titleWidth: Math.max(Catalog.TITLE_MIN,
                                                  budget - _sum(w, keys)) };
+    }
+
+    function _sameWidths(a, b) {
+        for (var k in a)
+            if (a[k] !== b[k])
+                return false;
+        for (var j in b)
+            if (!(j in a))
+                return false;
+        return true;
     }
 
     function _sum(map, keys) {

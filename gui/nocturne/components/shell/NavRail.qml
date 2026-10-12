@@ -32,6 +32,8 @@ Item {
     // including held threshold previews, reversals, and cancelled gestures.
     readonly property real toggleRowProgress: headerHost ? 1 - labelOpacity : 1
     readonly property bool resizing: resizeHandle.pressed
+    // Under the pointer or springing to rest: the edge is moving either way.
+    readonly property bool moving: resizeHandle.dragging || resizeHandle.animating
     readonly property real effectiveMaximum: resizeHandle.effectiveMaximum
     readonly property real targetWidth: resizeHandle.targetWidth
 
