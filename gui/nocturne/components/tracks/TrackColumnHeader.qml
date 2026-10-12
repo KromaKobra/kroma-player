@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import Nocturne
 import "../controls"
+import "TrackColumns.js" as Catalog
 
 /*
  * The header strip above a track list.
@@ -24,6 +25,13 @@ import "../controls"
  *
  * Right-click toggles columns.
  *
+ * A click that never became a reorder sorts, when the list asks for it by
+ * handing over `sortDirections`. Each header steps through its sort keys —
+ * natural direction, flipped, then the next key, then off; see
+ * TrackColumns.nextSort — and a chevron beside the label says which column and
+ * which way. The header only *requests* a sort: whoever owns the query owns the
+ * state, and the arrow follows `sortField`/`sortAscending` back down.
+ *
  * Note what is deliberately *not* here: a full-fill MouseArea that claims
  * clicks. This header sits over the list in the Library, and one that did
  * would swallow presses meant for the rows underneath. Hover and right-click
@@ -45,6 +53,34 @@ Item {
 
     readonly property var columns: layout ? layout.renderedColumns : []
     readonly property real gap: Theme.gap
+
+    // ------------------------------------------------------------- sorting
+
+    // {fieldKey: ascendingFirst}, from TrackColumns.sortDirections. Empty —
+    // the default — leaves every header inert, which is what the queue,
+    // playlists and the other lists whose order means something want.
+    property var sortDirections: ({})
+    // The sort the owner has chosen, "" for none. Only drawn from here, never
+    // written: the click asks, `sortRequested`, and the answer comes back in.
+    property string sortField: ""
+    property bool sortAscending: false
+
+    signal sortRequested(string field, bool ascending)
+
+    function cycle(keys) {
+        var next = Catalog.nextSort(keys, sortField, sortAscending, sortDirections);
+        if (next.field !== sortField || next.ascending !== sortAscending)
+            sortRequested(next.field, next.ascending);
+    }
+
+    function sortDescription(name, active) {
+        return active ? name + ", sorted " + (sortAscending ? "ascending" : "descending")
+                      : name;
+    }
+
+    readonly property var titleSortKeys: Catalog.sortableKeys(Catalog.TITLE_SORT_KEYS,
+                                                              sortDirections)
+    readonly property bool titleSorted: titleSortKeys.indexOf(sortField) !== -1
 
     implicitHeight: 24
 
@@ -157,19 +193,42 @@ Item {
         anchors.rightMargin: header.sideMargin + header.trailWidth
 
         // The title column: pinned, never reordered, and resized only through
-        // the divider of whichever column sits to its right.
-        Text {
-            id: titleLabel
+        // the divider of whichever column sits to its right. Its cell stacks
+        // the title over the artist, so its label names whichever of the two
+        // the list is sorted by.
+        Item {
+            id: titleCell
+            objectName: "columnHeader_title"
             x: 0
             width: header.layout ? header.layout.titleWidth : 0
-            anchors.verticalCenter: parent.verticalCenter
-            text: "TITLE"
-            elide: Text.ElideRight
-            color: Theme.faint
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fzTiny
-            font.weight: Font.DemiBold
-            font.letterSpacing: 1.4
+            height: parent.height
+
+            readonly property bool sortable: header.titleSortKeys.length > 0
+            readonly property string name: header.sortField === "artist" ? "Artist" : "Title"
+
+            Accessible.role: Accessible.ColumnHeader
+            Accessible.name: header.sortDescription(name, header.titleSorted)
+            Accessible.onPressAction: if (sortable) header.cycle(header.titleSortKeys)
+
+            SortLabel {
+                id: titleLabel
+                anchors.fill: parent
+                text: titleCell.name.toUpperCase()
+                active: header.titleSorted
+                ascending: header.sortAscending
+                hovered: titleArea.containsMouse
+                pressed: titleArea.pressed
+            }
+
+            MouseArea {
+                id: titleArea
+                anchors.fill: parent
+                enabled: titleCell.sortable
+                hoverEnabled: true
+                acceptedButtons: Qt.LeftButton
+                cursorShape: Qt.PointingHandCursor
+                onClicked: header.cycle(header.titleSortKeys)
+            }
         }
 
         Repeater {
@@ -178,6 +237,7 @@ Item {
 
             delegate: Item {
                 id: cell
+                objectName: "columnHeader_" + colDef.key
 
                 required property int index
                 required property var modelData
@@ -192,6 +252,15 @@ Item {
 
                 readonly property bool beingDragged: header.isDragging
                                                      && header.draggedKey === colDef.key
+
+                readonly property var sortKeys: Catalog.sortableKeys(colDef.sortKeys,
+                                                                     header.sortDirections)
+                readonly property bool sortable: sortKeys.length > 0
+                readonly property bool sorted: sortKeys.indexOf(header.sortField) !== -1
+
+                Accessible.role: Accessible.ColumnHeader
+                Accessible.name: header.sortDescription(colDef.label || "", sorted)
+                Accessible.onPressAction: if (sortable) header.cycle(sortKeys)
 
                 // x is derived from the layout rather than laid out by a Row, so
                 // that the header and the row delegate run the same arithmetic
@@ -298,6 +367,9 @@ Item {
                     anchors.fill: parent
                     z: 5
                     acceptedButtons: Qt.LeftButton
+                    // Hover only lights the label of a header that sorts; one
+                    // that doesn't has nothing to offer a click.
+                    hoverEnabled: cell.sortable
                     cursorShape: cell.beingDragged ? Qt.ClosedHandCursor
                                                    : Qt.OpenHandCursor
 
@@ -309,7 +381,10 @@ Item {
                         dragging = false;
                     }
 
+                    // Hover reports moves too; only a held button reorders.
                     onPositionChanged: function (mouse) {
+                        if (!pressed)
+                            return;
                         if (!dragging && Math.abs(mouse.x - startX) > 5) {
                             dragging = true;
                             header.draggedKey = colDef.key;
@@ -323,11 +398,17 @@ Item {
                         header.dropIndex = header.computeDropIndex(p);
                     }
 
+                    // A press that never travelled far enough to be a reorder
+                    // is a click, and a click sorts — but only if it lets go
+                    // over the cell, so dragging off is still a way to change
+                    // your mind.
                     onReleased: {
                         var wasDragging = dragging;
                         dragging = false;
                         if (wasDragging)
                             header.endDrag(true);
+                        else if (cell.sortable && containsMouse)
+                            header.cycle(cell.sortKeys);
                     }
 
                     onCanceled: {
@@ -337,20 +418,15 @@ Item {
                 }
 
                 // ---- label ----
-                Text {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    horizontalAlignment: colDef.align === "right" ? Text.AlignRight
-                                       : colDef.align === "centre" ? Text.AlignHCenter
-                                       : Text.AlignLeft
+                SortLabel {
+                    anchors.fill: parent
                     text: colDef.label || ""
-                    elide: Text.ElideRight
-                    color: Theme.faint
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fzTiny
-                    font.weight: Font.DemiBold
-                    font.letterSpacing: 1.4
+                    alignRight: colDef.align === "right"
+                    centred: colDef.align === "centre"
+                    active: cell.sorted
+                    ascending: header.sortAscending
+                    hovered: dragArea.containsMouse
+                    pressed: dragArea.pressed && !dragArea.dragging
                     opacity: cell.beingDragged ? 0.3 : 1
                     Behavior on opacity { NumberAnimation { duration: Theme.fast } }
                 }
@@ -398,7 +474,17 @@ Item {
                 // The checkmark idiom used by the rest of the interface -- see
                 // the Library's sort menu.
                 iconName: modelData.visible ? "check" : ""
-                onTriggered: header.layout.toggle(modelData.key)
+                onTriggered: {
+                    // Hiding the column a list is sorted by would leave an
+                    // order with nothing on screen to explain it, or to undo
+                    // it from — so the sort goes with the column.
+                    var col = Catalog.entry(modelData.key);
+                    if (modelData.visible && col
+                            && Catalog.sortableKeys(col.sortKeys, header.sortDirections)
+                                      .indexOf(header.sortField) !== -1)
+                        header.sortRequested("", false);
+                    header.layout.toggle(modelData.key);
+                }
             }
             onObjectAdded: (index, obj) => columnMenu.insertItem(index, obj)
             onObjectRemoved: (index, obj) => columnMenu.removeItem(obj)
@@ -414,6 +500,113 @@ Item {
         MenuRow {
             text: "Reset columns"
             onTriggered: header.layout.reset()
+        }
+    }
+
+    // ------------------------------------------------------------ sort label
+
+    /* A header's label, and the chevron that says the list is sorted by it.
+     *
+     * The chevron sits on the side away from the column's alignment — after a
+     * left-aligned label, before a right-aligned one — so the label never moves
+     * when it appears, and right-aligned figures stay over their digits. It
+     * reserves its room only while shown, so an unsorted label keeps the whole
+     * cell to elide into.
+     *
+     * One glyph, turned rather than swapped: a flip reads as the same arrow
+     * reversing, and a rotation is a transform, so the SVG is never
+     * rasterised again for it. */
+    component SortLabel: Item {
+        id: sortLabel
+
+        property string text: ""
+        property bool alignRight: false
+        property bool centred: false
+        property bool active: false
+        property bool ascending: false
+        property bool hovered: false
+        property bool pressed: false
+
+        readonly property int arrowSize: 10
+        readonly property int arrowGap: 4
+        readonly property int reserve: active ? arrowSize + arrowGap : 0
+        readonly property int motion: Theme.prefs.reducedMotion ? 0 : Theme.fast
+
+        // The direction the chevron shows, held while the label is not the
+        // sorted one. Every label is handed the list's direction, and without
+        // this one that is fading out would turn to follow a sort that has
+        // moved to another column.
+        property bool shownAscending: false
+        Binding on shownAscending {
+            when: sortLabel.active
+            value: sortLabel.ascending
+            restoreMode: Binding.RestoreNone
+        }
+
+        Text {
+            id: label
+            objectName: "sortLabelText"
+            anchors.verticalCenter: parent.verticalCenter
+            x: sortLabel.alignRight ? parent.width - width
+             : sortLabel.centred ? Math.round((parent.width - width) / 2)
+             : 0
+            width: Math.min(implicitWidth, Math.max(0, parent.width - sortLabel.reserve))
+            text: sortLabel.text
+            elide: Text.ElideRight
+            color: sortLabel.pressed ? Theme.text
+                 : (sortLabel.active || sortLabel.hovered) ? Theme.dim
+                 : Theme.faint
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fzTiny
+            font.weight: Font.DemiBold
+            font.letterSpacing: 1.4
+            Behavior on color { ColorAnimation { duration: Theme.fast } }
+
+            // The stacked title header renames itself as it moves from one of
+            // its keys to the next: out, swap, back in, so the change reads as
+            // the header changing what it means rather than as a flicker.
+            Behavior on text {
+                enabled: sortLabel.motion > 0
+                SequentialAnimation {
+                    NumberAnimation { target: label; property: "opacity"; to: 0
+                                      duration: sortLabel.motion / 2 }
+                    PropertyAction {}
+                    NumberAnimation { target: label; property: "opacity"; to: 1
+                                      duration: sortLabel.motion / 2 }
+                }
+            }
+        }
+
+        Icon {
+            id: arrow
+            objectName: "sortArrow"
+            name: "chevronDown"
+            size: sortLabel.arrowSize
+            strokeWidth: 2.4
+            // Fixed rather than following the label's hover tint: Icon's
+            // colour is its SVG, and animating it would re-rasterise the glyph
+            // every frame of the fade.
+            color: Theme.dim
+            anchors.verticalCenter: label.verticalCenter
+            x: sortLabel.alignRight ? label.x - sortLabel.arrowGap - width
+                                    : label.x + label.width + sortLabel.arrowGap
+            rotation: sortLabel.shownAscending ? 180 : 0
+
+            opacity: sortLabel.active ? 1 : 0
+            scale: sortLabel.active ? 1 : 0.8
+            visible: opacity > 0
+
+            // Only a chevron already on screen turns. One arriving takes its
+            // direction at once, so it never fades in mid-spin.
+            Behavior on rotation {
+                enabled: arrow.opacity === 1
+                NumberAnimation { duration: Theme.prefs.reducedMotion ? 0 : Theme.normal
+                                  easing.type: Theme.easing }
+            }
+            Behavior on opacity { NumberAnimation { duration: sortLabel.motion } }
+            Behavior on scale {
+                NumberAnimation { duration: sortLabel.motion; easing.type: Theme.easing }
+            }
         }
     }
 }

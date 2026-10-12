@@ -10,6 +10,10 @@ NocturneMenu {
     required property string viewKey
     property real viewportWidth: 0
     readonly property bool gridMode: Theme.prefs[viewKey + "Grid"]
+    // Whether anything the owner declared is showing above the display
+    // controls. Off, the separator between the two goes too, rather than
+    // opening the menu on a rule with nothing above it.
+    property bool leadingSeparator: true
     transformOrigin: Item.TopRight
 
     function openFor(anchor) {
@@ -17,6 +21,8 @@ NocturneMenu {
     }
 
     property Item displaySeparator: MenuSeparator {
+        visible: root.leadingSeparator
+        height: visible ? implicitHeight : 0
         padding: 0; topPadding: 4; bottomPadding: 4
         contentItem: Rectangle { implicitHeight: 1; color: Theme.line }
     }

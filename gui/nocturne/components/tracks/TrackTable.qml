@@ -61,6 +61,15 @@ Item {
     // works — it just shows title and artist and no header.
     property var columnLayout: null
 
+    // Click-to-sort on the column header. Handed straight to it — see
+    // TrackColumnHeader. Left empty, the headers do not sort: most lists here
+    // have an order of their own (the queue, a playlist) or one decided
+    // elsewhere (search relevance).
+    property var sortDirections: ({})
+    property string sortField: ""
+    property bool sortAscending: false
+    signal sortRequested(string field, bool ascending)
+
     // Which action the STATUS column offers, if the profile has one:
     // "web" (download a search result) | "import" (stash or download a
     // candidate) | "" (no status column here).
@@ -2625,6 +2634,11 @@ Item {
         // Only paint a background once it is actually over the rows.
         pinned: root._sticky && root._headerY <= 0.5
         onWheelDelta: root._sticky ? list.wheelHandler.handleWheel : null
+
+        sortDirections: root.sortDirections
+        sortField: root.sortField
+        sortAscending: root.sortAscending
+        onSortRequested: (field, ascending) => root.sortRequested(field, ascending)
     }
 
     // ------------------------------------------------------------ empty state

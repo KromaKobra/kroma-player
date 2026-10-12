@@ -42,6 +42,11 @@ var TITLE_MIN = 150;
 // window drag that lands on the threshold cannot flap it on and off.
 var RESTORE_MARGIN = 16;
 
+// What a click on the pinned title header sorts by. The cell stacks the title
+// over the artist, so its header steps through both: each field in its natural
+// direction, then flipped, then the next field, then off.
+var TITLE_SORT_KEYS = ["title", "artist"];
+
 
 /* Every column that is not pinned. Declaration order is the right-click menu
  * order.
@@ -53,37 +58,45 @@ var RESTORE_MARGIN = 16;
  *   resizable  false = fixed width, and no drag handle on its left edge
  *   absorbs    false = never gives up width to a *neighbour's* resize
  *   droppable  false = never auto-dropped when the window runs out of room
+ *   sortKeys   catalog fields a click on the header steps through, in order;
+ *              absent = the header does not sort
  */
 var COLUMNS = {
     album: {
         key: "album", field: "album", label: "ALBUM",
         pref: 220, min: 90, max: 0,
-        renderer: "text", align: "left"
+        renderer: "text", align: "left",
+        sortKeys: ["album"]
     },
     duration: {
         key: "duration", field: "duration", label: "TIME",
         pref: 64, min: 52, max: 0,
-        renderer: "duration", align: "right", numeric: true
+        renderer: "duration", align: "right", numeric: true,
+        sortKeys: ["duration"]
     },
     bpm: {
         key: "bpm", field: "bpm", label: "BPM",
         pref: 62, min: 48, max: 0,
-        renderer: "text", align: "right", numeric: true
+        renderer: "text", align: "right", numeric: true,
+        sortKeys: ["bpm"]
     },
     key: {
         key: "key", field: "key", label: "KEY",
         pref: 62, min: 44, max: 0,
-        renderer: "text", align: "left"
+        renderer: "text", align: "left",
+        sortKeys: ["key"]
     },
     date: {
         key: "date", field: "date", label: "RELEASED",
         pref: 110, min: 76, max: 0,
-        renderer: "date", align: "left"
+        renderer: "date", align: "left",
+        sortKeys: ["date"]
     },
     stashedDate: {
         key: "stashedDate", field: "stashedDate", label: "ADDED",
         pref: 110, min: 76, max: 0,
-        renderer: "date", align: "left"
+        renderer: "date", align: "left",
+        sortKeys: ["stashedDate"]
     },
     genres: {
         key: "genres", field: "genres", label: "GENRES",
@@ -93,7 +106,8 @@ var COLUMNS = {
     isrc: {
         key: "isrc", field: "isrc", label: "ISRC",
         pref: 130, min: 100, max: 0,
-        renderer: "text", align: "left"
+        renderer: "text", align: "left",
+        sortKeys: ["isrc"]
     },
     // Where an import row's audio comes from, and what taking it in costs.
     //
@@ -211,6 +225,68 @@ function clampWidth(col, width) {
 function isResizable(col) { return col.resizable !== false; }
 function absorbs(col) { return col.absorbs !== false; }
 function isDroppable(col) { return col.droppable !== false; }
+
+/* Which fields a header may sort by, and which way a first click goes.
+ *
+ * Built from the backend's field catalog (`libraryVM.fields`) rather than
+ * declared here, so a column can only offer a sort the query can run. Passed in
+ * because a `.pragma library` file cannot see context properties.
+ *
+ * The first click goes the way people expect to read each kind of value: words
+ * A to Z, and everything measured — dates, tempo, length — biggest or newest
+ * first, which is how Finder and Music treat their columns.
+ *
+ * Returns {fieldKey: ascendingFirst}.
+ */
+function sortDirections(catalog) {
+    var out = {};
+    if (!catalog)
+        return out;
+    for (var i = 0; i < catalog.length; ++i) {
+        var f = catalog[i];
+        if (f && f.sortable)
+            out[f.key] = f.type === "string";
+    }
+    return out;
+}
+
+/* The sort keys of `keys` this list can actually run, in declaration order. */
+function sortableKeys(keys, directions) {
+    var out = [];
+    if (!keys || !directions)
+        return out;
+    for (var i = 0; i < keys.length; ++i)
+        if (directions[keys[i]] !== undefined)
+            out.push(keys[i]);
+    return out;
+}
+
+/* What one click on a header does to the current sort.
+ *
+ * A header steps through its keys, each first in its natural direction and
+ * then flipped, and after the last one turns the sort off ({field: ""}). A
+ * header whose keys do not include the current field starts again from its
+ * first. A current sort in a key's *un*-natural direction — restored from
+ * settings, or chosen in the grid view's menu — counts as that key's second
+ * step, so the next click still moves forward rather than repeating.
+ */
+function nextSort(keys, field, ascending, directions) {
+    var usable = sortableKeys(keys, directions);
+    if (usable.length === 0)
+        return { field: field, ascending: ascending };
+
+    var i = usable.indexOf(field);
+    if (i === -1)
+        return { field: usable[0], ascending: directions[usable[0]] };
+
+    if (ascending === directions[field])
+        return { field: field, ascending: !ascending };
+
+    if (i + 1 < usable.length)
+        return { field: usable[i + 1], ascending: directions[usable[i + 1]] };
+
+    return { field: "", ascending: false };
+}
 
 /* Clean a restored order: drop unknown keys, duplicates, and anything this
  * profile does not offer.

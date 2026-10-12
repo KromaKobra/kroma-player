@@ -5,6 +5,7 @@ import Nocturne
 import "../../components/controls"
 import "../../components/library"
 import "../../components/tracks"
+import "../../components/tracks/TrackColumns.js" as Catalog
 
 // The sidebar selects Songs, Artists or Albums over persistent library views.
 Item {
@@ -50,13 +51,26 @@ Item {
 
     // ---------------------------------------------------------------- tracks
 
+    // What the list is in when nobody has chosen a sort: newest first. Kept
+    // apart from the chosen sort rather than stored as one, so the headers can
+    // tell "sorted by date added" (an arrow) from "not sorted" (none).
+    readonly property string defaultSort: "stashedDate"
+    readonly property bool sortChosen: Theme.prefs.librarySort !== ""
+    readonly property string effectiveSort: sortChosen ? Theme.prefs.librarySort : defaultSort
+    readonly property bool effectiveAscending: sortChosen && Theme.prefs.librarySortAsc
+
+    function chooseSort(field, ascending) {
+        Theme.prefs.librarySortAsc = ascending
+        Theme.prefs.librarySort = field
+    }
+
     // The library's own list, declared here rather than borrowed from searchVM:
     // Search owns its results, and the two would otherwise overwrite each other.
     TrackQuery {
         id: libraryTracks
         objectName: "libraryTracks"
-        sortField: Theme.prefs.librarySort
-        sortAscending: Theme.prefs.librarySortAsc
+        sortField: root.effectiveSort
+        sortAscending: root.effectiveAscending
     }
 
     function shuffled(ids) {
@@ -131,6 +145,11 @@ Item {
         rowHeight: Theme.prefs.songCompact ? 40 : Theme.rowHeight
         listVM: libraryTracks
         showIndex: true
+        // The catalog is constant, so this is worked out once.
+        sortDirections: Catalog.sortDirections(libraryVM.fields)
+        sortField: Theme.prefs.librarySort
+        sortAscending: Theme.prefs.librarySortAsc
+        onSortRequested: (field, ascending) => root.chooseSort(field, ascending)
         // Not just about painting: TrackTable claims TrackSelection on becoming
         // active, so a table left active behind the grid would keep Escape,
         // Delete and the info panel bound to a list nobody can see.
@@ -207,6 +226,11 @@ Item {
     // Written out rather than generated: a Repeater inside a
     // Menu parents its items to the internal list instead of registering them
     // as entries, so they never appear.
+    //
+    // Grid view only. In the list the column headers are where sorting lives,
+    // and a second control for the same thing would be one more place to
+    // wonder which of them is in charge. The tiles have no headers, so here it
+    // stays, over the same state the headers read.
     ButtonGroup { id: sortFields }
     ButtonGroup { id: sortDirections }
 
@@ -215,6 +239,7 @@ Item {
         objectName: "songsSortMenu"
         viewKey: "song"
         viewportWidth: libraryTable.width - 2 * libraryTable.sideMargin
+        leadingSeparator: Theme.prefs.songGrid
         transformOrigin: Item.TopRight
         enter: Transition {
             ParallelAnimation {
@@ -230,72 +255,82 @@ Item {
                               duration: Theme.prefs.reducedMotion ? 0 : Theme.fast }
         }
 
-        MenuRow { text: "Sort by"; enabled: false }
-        MenuSeparator {}
+        MenuRow {
+            text: "Sort by"; enabled: false
+            visible: Theme.prefs.songGrid; height: visible ? implicitHeight : 0
+        }
+        MenuSeparator { visible: Theme.prefs.songGrid; height: visible ? implicitHeight : 0 }
 
         MenuRow {
             text: "Title"
             objectName: "songsSort_title"
             ButtonGroup.group: sortFields
             checkable: true
-            checked: Theme.prefs.librarySort === "title"
+            visible: Theme.prefs.songGrid; height: visible ? implicitHeight : 0
+            checked: root.effectiveSort === "title"
             iconName: checked ? "check" : ""
-            onTriggered: Theme.prefs.librarySort = "title"
+            onTriggered: root.chooseSort("title", root.effectiveAscending)
         }
         MenuRow {
             text: "Artist"
             objectName: "songsSort_artist"
             ButtonGroup.group: sortFields
             checkable: true
-            checked: Theme.prefs.librarySort === "artist"
+            visible: Theme.prefs.songGrid; height: visible ? implicitHeight : 0
+            checked: root.effectiveSort === "artist"
             iconName: checked ? "check" : ""
-            onTriggered: Theme.prefs.librarySort = "artist"
+            onTriggered: root.chooseSort("artist", root.effectiveAscending)
         }
         MenuRow {
             text: "Album"
             objectName: "songsSort_album"
             ButtonGroup.group: sortFields
             checkable: true
-            checked: Theme.prefs.librarySort === "album"
+            visible: Theme.prefs.songGrid; height: visible ? implicitHeight : 0
+            checked: root.effectiveSort === "album"
             iconName: checked ? "check" : ""
-            onTriggered: Theme.prefs.librarySort = "album"
+            onTriggered: root.chooseSort("album", root.effectiveAscending)
         }
         MenuRow {
             text: "Date added"
             objectName: "songsSort_stashedDate"
             ButtonGroup.group: sortFields
             checkable: true
-            checked: Theme.prefs.librarySort === "stashedDate"
+            visible: Theme.prefs.songGrid; height: visible ? implicitHeight : 0
+            checked: root.effectiveSort === "stashedDate"
             iconName: checked ? "check" : ""
-            onTriggered: Theme.prefs.librarySort = "stashedDate"
+            onTriggered: root.chooseSort("stashedDate", root.effectiveAscending)
         }
         MenuRow {
             text: "Duration"
             objectName: "songsSort_duration"
             ButtonGroup.group: sortFields
             checkable: true
-            checked: Theme.prefs.librarySort === "duration"
+            visible: Theme.prefs.songGrid; height: visible ? implicitHeight : 0
+            checked: root.effectiveSort === "duration"
             iconName: checked ? "check" : ""
-            onTriggered: Theme.prefs.librarySort = "duration"
+            onTriggered: root.chooseSort("duration", root.effectiveAscending)
         }
-        MenuSeparator {}
+        MenuSeparator { visible: Theme.prefs.songGrid; height: visible ? implicitHeight : 0 }
         MenuRow {
             objectName: "songsSortAscending"
             ButtonGroup.group: sortDirections
             text: "Ascending"
             checkable: true
-            checked: Theme.prefs.librarySortAsc
+            visible: Theme.prefs.songGrid; height: visible ? implicitHeight : 0
+            checked: root.effectiveAscending
             iconName: checked ? "check" : ""
-            onTriggered: Theme.prefs.librarySortAsc = true
+            onTriggered: root.chooseSort(root.effectiveSort, true)
         }
         MenuRow {
             objectName: "songsSortDescending"
             ButtonGroup.group: sortDirections
             text: "Descending"
             checkable: true
-            checked: !Theme.prefs.librarySortAsc
+            visible: Theme.prefs.songGrid; height: visible ? implicitHeight : 0
+            checked: !root.effectiveAscending
             iconName: checked ? "check" : ""
-            onTriggered: Theme.prefs.librarySortAsc = false
+            onTriggered: root.chooseSort(root.effectiveSort, false)
         }
     }
 

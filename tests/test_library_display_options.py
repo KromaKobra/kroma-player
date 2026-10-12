@@ -87,7 +87,14 @@ def test_display_menu_switches_layout_and_density_and_remembers_it(
     compact = item(window, key + "CompactOption")
     slider = item(window, key + "TileSlider")
     # Footer order includes the divider and survives arbitrary content above it.
-    assert layout.y() > menu.property("displaySeparator").y()
+    # The songs list has none in list view — its column headers sort — so there
+    # the divider goes too, rather than opening the menu on a bare rule.
+    separator = menu.property("displaySeparator")
+    if key == "song":
+        assert not separator.isVisible()
+        assert layout.y() >= separator.y()
+    else:
+        assert layout.y() > separator.y()
     assert compact.y() > layout.y()
     assert compact.isVisible() is not default_grid
     assert slider.isVisible() is default_grid

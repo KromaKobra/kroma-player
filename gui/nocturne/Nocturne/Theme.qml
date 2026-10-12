@@ -56,10 +56,11 @@ QtObject {
         onReducedMotionChanged: if (root._ready) SettingsStore.setValue("reducedMotion", reducedMotion)
 
         // Library track list ordering. `librarySort` is a catalog field key —
-        // see libraryVM.fields for which ones are sortable. Newest first by
-        // default: what you just imported is what you are most likely looking
-        // for.
-        property string librarySort: SettingsStore.value("librarySort", "stashedDate")
+        // see libraryVM.fields for which ones are sortable — or "" for no
+        // chosen sort, which the column headers show as no arrow at all and
+        // LibraryView resolves to newest first: what you just imported is what
+        // you are most likely looking for.
+        property string librarySort: SettingsStore.value("librarySort", "")
         onLibrarySortChanged: if (root._ready) SettingsStore.setValue("librarySort", librarySort)
 
         property bool librarySortAsc: SettingsStore.value("librarySortAsc", false)

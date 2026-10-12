@@ -95,45 +95,70 @@ def test_narrow_header_stacks_actions_without_overlap(header):
     assert not item.property("stacked")
 
 
-def test_more_menu_changes_sort_and_preserves_checked_selection(application_gui):
+def test_more_menu_sorts_only_in_grid_view(application_gui):
+    """In list view the column headers sort, so the menu's sort rows are grid-only.
+
+    Both drive the same state: what the menu checks is what the headers show.
+    """
     from PySide6.QtCore import QObject, QPointF
 
     window, app = application_gui
     window.findChild(QQuickItem, "navRail").libraryNavigated.emit(0)
     QTest.qWait(250)
     more = window.findChild(QQuickItem, "songsMoreButton")
-    more.forceActiveFocus(Qt.TabFocusReason)
-    QTest.keyClick(window, Qt.Key_Space)
-    QTest.qWait(150)
     menu = window.findChild(QObject, "songsSortMenu")
-    assert menu.property("visible")
+    table = window.findChild(QQuickItem, "libraryTable")
     query = window.findChild(QObject, "libraryTracks")
-    original_sort = query.property("sortField")
-    original_ascending = query.property("sortAscending")
+    layout = window.findChild(QObject, "songLayoutOption")
+    original_grid = menu.property("gridMode")
+    original_sort = table.property("sortField")
+    original_ascending = table.property("sortAscending")
 
-    def choose(name):
-        row = window.findChild(QQuickItem, name)
-        # Open through the actual button, including after an earlier choice.
+    def open_menu():
         if not menu.property("visible"):
             more.forceActiveFocus(Qt.TabFocusReason)
             QTest.keyClick(window, Qt.Key_Space)
             QTest.qWait(150)
+        assert menu.property("visible")
+
+    def choose(name):
+        row = window.findChild(QQuickItem, name)
+        # Open through the actual button, including after an earlier choice.
+        open_menu()
         point = row.mapToScene(QPointF(row.width() / 2, row.height() / 2)).toPoint()
         QTest.mouseClick(window, Qt.LeftButton, Qt.NoModifier, point)
         QTest.qWait(150)
         assert row.property("checked")
 
     try:
+        if original_grid:
+            layout.triggered.emit()
+        open_menu()
+        for name in ("songsSort_title", "songsSortAscending"):
+            assert not window.findChild(QQuickItem, name).isVisible()
+        menu.close()
+        QTest.qWait(200)   # let the exit transition finish before reopening
+
+        layout.triggered.emit()
+        assert menu.property("gridMode")
+        # Nothing chosen yet reads as the default it resolves to.
+        table.sortRequested.emit("", False)
+        open_menu()
+        assert window.findChild(QQuickItem, "songsSort_stashedDate").property("checked")
+        assert window.findChild(QQuickItem, "songsSortDescending").property("checked")
+
         for key in ("album", "duration", "artist", "stashedDate", "title", "title"):
             choose("songsSort_" + key)
             assert query.property("sortField") == key
+            assert table.property("sortField") == key
         for name, ascending in [("songsSortDescending", False),
                                 ("songsSortAscending", True),
                                 ("songsSortAscending", True)]:
             choose(name)
             assert query.property("sortAscending") == ascending
+            assert table.property("sortAscending") == ascending
     finally:
         menu.close()
-        window.findChild(QObject, "songsSort_" + original_sort).triggered.emit()
-        direction = "songsSortAscending" if original_ascending else "songsSortDescending"
-        window.findChild(QObject, direction).triggered.emit()
+        table.sortRequested.emit(original_sort, original_ascending)
+        if menu.property("gridMode") != original_grid:
+            layout.triggered.emit()

@@ -155,6 +155,15 @@ count only means something beside the window it was chosen in, while a width
 survives a resize and travels to another machine. They are kept apart from each
 other for the same reason `artistSort` and `albumSort` are.
 
+The songs list sorts from its column headers. A click steps a header through its
+keys — natural direction first (words A to Z, dates and numbers largest first),
+then flipped, then off — and the stacked TITLE header steps through title and
+then artist, renaming itself to ARTIST for the second. `librarySort` is `""`
+when nothing is chosen, which shows no arrow and lists newest first. The
+cycle is `TrackColumns.nextSort`; a column offers a sort through `sortKeys`, and
+only for fields the backend catalog marks sortable. Grid view has no headers,
+so its ⋯ menu keeps a Sort section over the same two preferences.
+
 Column widths are one key per profile — `columns.queue`, `columns.library`,
 `columns.playlist`, `columns.album`, `columns.search`, `columns.webSearch`,
 `columns.import`. The album keeps its own even though it draws the library's
