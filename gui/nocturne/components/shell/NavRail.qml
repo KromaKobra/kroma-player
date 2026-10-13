@@ -41,7 +41,7 @@ Item {
     signal libraryNavigated(int mode)
 
     readonly property var mainItems: [
-        { view: 13, icon: "navHome", label: "Home" },
+        // { view: 13, icon: "navHome", label: "Home" },
         { view: 0, icon: "navPlaying", label: "Now Playing" },
         { view: 1, icon: "navQueue", label: "Queue" },
         { view: 2, icon: "navSearch", label: "Search" },

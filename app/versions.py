@@ -11,7 +11,7 @@ from __future__ import annotations
 # so a value that trails the tags offers every user an update to the version
 # they are already running. ``tests/test_versions.py`` enforces the changelog
 # half of it, which is the half that can be checked offline.
-APP_VERSION = "1.2.1"
+APP_VERSION = "1.3.0"
 
 GUI_API_VERSION = 13
 MIN_GUI_API_VERSION = 13
