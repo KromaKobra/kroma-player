@@ -109,6 +109,7 @@ SETTINGS_SINGLETON = "SettingsStore"
 
 _settings_singleton_registered = False
 _settings_singleton_source: SettingsViewModel | None = None
+_qml_types_registered = False
 
 
 def _build_settings_singleton(engine) -> SettingsViewModel:
@@ -124,6 +125,11 @@ def _build_settings_singleton(engine) -> SettingsViewModel:
     the life of the process.
     """
     source = _settings_singleton_source
+    if source is None:
+        raise RuntimeError(
+            "Kroma.Settings was imported before the settings store was known; "
+            "call register_settings_singleton() before loading a GUI"
+        )
     return SettingsViewModel(source.store, source.guiPackage, parent=engine)
 
 
@@ -146,8 +152,19 @@ def register_settings_singleton(view_model: SettingsViewModel) -> None:
     as unavailable and loads no window at all. Calling this again re-points the
     factory, which is what a second engine in one process needs.
     """
-    global _settings_singleton_registered, _settings_singleton_source
+    global _settings_singleton_source
     _settings_singleton_source = view_model
+    _register_settings_singleton_type()
+
+
+def _register_settings_singleton_type() -> None:
+    """Register ``Kroma.Settings`` once, whether or not its store is known yet.
+
+    Split from the above so the type can exist before the vault does: the
+    factory reads the store only when an engine first asks for the singleton,
+    so registering early and pointing it at a store later is safe.
+    """
+    global _settings_singleton_registered
     if _settings_singleton_registered:
         return
     qmlRegisterSingletonType(
@@ -161,18 +178,25 @@ def register_settings_singleton(view_model: SettingsViewModel) -> None:
 def _register_qml_types(registry=None) -> None:
     """Register everything a GUI package can ``import``.
 
-    *registry* is optional only so the types a GUI declares for itself can be
-    registered without building the backend; the application always passes one,
-    and without it the settings singleton is absent and any QML that imports
-    ``Kroma.Settings`` fails to load.
+    *registry* is optional because the types have to exist before the backend
+    does. Without one, ``Kroma.Settings`` is registered but has no store behind
+    it yet; calling this again with the registry points it at one. Repeat calls
+    register nothing new.
 
-    Call it **before** the QML engine is created. An engine that already exists
-    when a type or singleton is registered does not reliably pick it up, and
-    the failure does not name the late type: Nocturne's `Theme` imports
+    Call it **before the first QML engine in the process** — not merely before
+    the GUI's. A type registered after any engine has existed, even one long
+    since deleted such as the vault setup window's, is not reliably picked up,
+    and the failure does not name the late type: Nocturne's `Theme` imports
     ``Kroma.Settings`` and dies with "Cannot assign object of type QtObject to
     property of type QObject*", taking every view that uses `Theme` with it.
     """
-    qmlRegisterType(TrackQuery, QML_MODULE, QML_MODULE_MAJOR, QML_MODULE_MINOR, "TrackQuery")
+    global _qml_types_registered
+    if not _qml_types_registered:
+        qmlRegisterType(
+            TrackQuery, QML_MODULE, QML_MODULE_MAJOR, QML_MODULE_MINOR, "TrackQuery"
+        )
+        _register_settings_singleton_type()
+        _qml_types_registered = True
     if registry is not None:
         register_settings_singleton(registry.get_service("settings_view_model"))
 
@@ -460,6 +484,11 @@ def _main():
     # after a snapshot of its database; a migration that fails comes back here
     # too, with the snapshot's location. All of it is app.vault.startup's, and
     # the picker already renders an initial error, so explaining costs no new UI.
+    # The QML types go in before the setup window can build the process's first
+    # engine — see _register_qml_types. The settings singleton has no store
+    # behind it until the registry exists; nothing before then imports it.
+    _register_qml_types()
+
     vault = ensure_vault_ready()
     while vault is not None:
         # Before the checks, not after: a migration step may reach the vault
@@ -504,10 +533,8 @@ def _main():
     # Before the engine exists — see the docstring.
     _enable_qml_disk_cache(resolved)
 
-    # Types a GUI can declare for itself, and the singletons it can import.
-    # Registered after the registry is built — the library context the types
-    # resolve through is already installed, and the settings singleton *is* a
-    # service out of it — and before the engine exists; see the docstring.
+    # Point the settings singleton at the store, now that there is one. The
+    # types themselves were registered before the vault setup window.
     _register_qml_types(registry)
 
     # Create QML engine, with the providers and view models in place.

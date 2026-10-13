@@ -103,6 +103,9 @@ def test_qml_types_are_registered_before_the_engine_exists():
     assert "_register_qml_types" in lines and "_build_engine" in lines
     assert "QQmlApplicationEngine" not in lines, "an engine made outside _build_engine"
     assert lines["_register_qml_types"] < lines["_build_engine"]
+    # The vault setup window is an engine too, and registering after it has
+    # existed breaks the GUI's engine just the same.
+    assert lines["_register_qml_types"] < lines["ensure_vault_ready"]
     assert "QQmlApplicationEngine" in first_calls(main_module._build_engine)
 
 
