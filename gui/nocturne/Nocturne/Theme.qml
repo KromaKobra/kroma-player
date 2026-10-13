@@ -40,7 +40,7 @@ QtObject {
         property string accent: SettingsStore.value("accent", "aurora")
         onAccentChanged: if (root._ready) SettingsStore.setValue("accent", accent)
 
-        property bool followArtwork: SettingsStore.value("followArtwork", false)
+        property bool followArtwork: SettingsStore.value("followArtwork", true)
         onFollowArtworkChanged: if (root._ready) SettingsStore.setValue("followArtwork", followArtwork)
 
         // "dark" | "light" | "system". Defaults to following the desktop:
