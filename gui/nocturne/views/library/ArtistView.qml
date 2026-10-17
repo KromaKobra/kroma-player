@@ -99,6 +99,8 @@ Item {
     NocturneMenu {
         id: artistMenu
 
+        PinMenuRow { contentType: "artist"; contentId: root.artistId }
+
         MenuRow {
             objectName: "artistEdit"
             text: "Edit artist…"

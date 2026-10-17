@@ -47,6 +47,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection, Engine
 
 from app.models.track import AlbumExternalId, ArtistExternalId, Base, TrackExternalId
+from app.models.sidebar_pin import SidebarPin  # noqa: F401 — register the table
 # Importing the playlist models registers their tables on the shared Base.metadata
 # so create_all() below creates them too. (noqa: imported for side effect only.)
 import app.models.playlist  # noqa: F401

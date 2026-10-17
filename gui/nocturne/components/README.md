@@ -45,6 +45,19 @@ the same.
 
 See [the settings guide](settings/README.md) when adding controls or settings pages.
 
+`controls/PinMenuRow` offers `Pin to sidebar` for one unpinned library item.
+It reads cached `pinsVM.items` to update visibility without querying on hover.
+`pinsVM.pin(type, id)` appends a shortcut, `unpin(type, id)` removes it, and
+`isPinned(type, id)` checks membership. Types are `track`, `album`, `artist`,
+and `playlist`; IDs are library integers. Items expose `contentType`,
+`contentId`, `title`, `subtitle`, and `coverHash` in persistent pin order.
+`shell/NavRail` renders these through its `pinModel`, hides the empty section,
+and emits `pinActivated(type, id)`. The window plays track shortcuts and opens
+collection shortcuts. Sidebar context menus offer `Unpin from sidebar`.
+The `sidebar_pins` table keeps only order and exclusive foreign-key references,
+so metadata stays live and owner deletion cascades its shortcut away. Reads
+are batched by content type; library events coalesce into one refresh per turn.
+
 Library entries share `LibrarySelection` (click/modifier/range selection),
 `LibrarySelectionBackground` (empty-space deselection in pooled lists and grids),
 `LibraryCard` (list/grid presentation), `LibraryPlayButton` (artwork overlay or

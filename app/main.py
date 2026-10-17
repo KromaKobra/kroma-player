@@ -52,6 +52,7 @@ CONTEXT_PROPERTIES = {
     "queueVM":          "queue_view_model",
     "historyVM":        "history_view_model",
     "sidebarVM":        "sidebar_view_model",
+    "pinsVM":           "pins_view_model",
     "databaseVM":       "database_view_model",
     "importVM":         "import_view_model",
     "settingsVM":       "settings_view_model",

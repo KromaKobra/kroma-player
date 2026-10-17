@@ -40,6 +40,8 @@ Item {
         contextMenu.entries = model.playbackEntries(Array.from(selectedIds))
         contextMenu.selectionCount = selectedIds.size
         contextMenu.inDetail = false
+        contextMenu.contentType = root.viewKey
+        contextMenu.contentId = uid
         contextMenu.popup()
     }
     onActiveChanged: {

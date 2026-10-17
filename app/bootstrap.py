@@ -27,6 +27,8 @@ from app.viewmodels.search_view_model import SearchViewModel
 from app.viewmodels.queue_view_model import QueueViewModel
 from app.viewmodels.history_view_model import HistoryViewModel
 from app.viewmodels.sidebar_view_model import SidebarViewModel
+from app.viewmodels.pins_view_model import PinsViewModel
+from app.repositories.sidebar_pin_repository import SidebarPinRepository
 from app.viewmodels.album_edit_view_model import AlbumEditViewModel
 from app.viewmodels.album_tracks_view_model import AlbumTracksViewModel
 from app.viewmodels.albums_view_model import AlbumsViewModel
@@ -181,6 +183,10 @@ def create_service_registry() -> ServiceRegistry:
 
     playlist_service = PlaylistService(playlist_repo, event_bus, cover_store)
     registry.register('playlist_service', playlist_service)
+
+    pin_repo = SidebarPinRepository(session)
+    registry.register('sidebar_pin_repository', pin_repo)
+    registry.register('pins_view_model', PinsViewModel(pin_repo, event_bus, playlist_service))
 
     # The only writer of the `lyrics` table. Every path that obtains lyrics —
     # a download, a metadata refresh, the Now Playing mic button, the one-off

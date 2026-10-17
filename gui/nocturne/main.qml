@@ -364,6 +364,10 @@ Window {
         }
     }
     Toast { id: navigationToast }
+    Connections {
+        target: pinsVM
+        function onError(message) { navigationToast.show(message, true) }
+    }
 
     // Typing in a field must not trigger the transport shortcuts, so the
     // single-key bindings live in Keys handlers on the focus scope below rather
@@ -475,6 +479,19 @@ Window {
             - (mainWindow.infoOpen ? 240 : 0))
         onNavigated: function (index) { mainWindow.selectTab(index) }
         onLibraryNavigated: function (mode) { mainWindow.selectTab(4, mode) }
+        pinModel: pinsVM
+        activePinType: mainWindow.viewIndex === 9 || mainWindow.viewIndex === 10 ? "artist"
+            : mainWindow.viewIndex === 11 || mainWindow.viewIndex === 12 ? "album"
+            : mainWindow.viewIndex === 3 ? "playlist" : ""
+        activePinId: activePinType === "artist" ? artistVM.artistId
+            : activePinType === "album" ? albumVM.albumId
+            : activePinType === "playlist" ? playlistsPage.openId : -1
+        onPinActivated: function(kind, id) {
+            if (kind === "track") playerVM.playEntries([{id: id}])
+            else if (kind === "artist") mainWindow.openArtist(id)
+            else if (kind === "album") mainWindow.openAlbum(id)
+            else if (kind === "playlist") mainWindow.openPlaylist(id)
+        }
         drawSurface: false
         headerHost: titleBar
         headerHovered: titleBar.sidebarHovered

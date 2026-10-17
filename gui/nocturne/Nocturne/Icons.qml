@@ -16,6 +16,7 @@ QtObject {
     ]
 
     readonly property var shapes: ({
+        "pin": '<path d="m16 3 5 5-4 1-3 5-1 4-3-3-6 6 6-6-3-3 4-1 5-3Z"/>',
         // Sidebar geometry from assets/gui-concept/scripts/icons.js. Separate
         // names preserve the established icon family elsewhere in the player.
         "navHome": '<path d="M4 10.4 12 4l8 6.4V19a1.5 1.5 0 0 1-1.5 1.5H15v-5.25a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1V20.5H5.5A1.5 1.5 0 0 1 4 19Z"/>',

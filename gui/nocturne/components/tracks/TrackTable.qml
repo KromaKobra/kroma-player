@@ -769,7 +769,10 @@ Item {
         playRows([row], trackId > 0 ? [trackId] : [])
     }
 
-    function openTrackMenu(uid, trackId, row, title) {
+    property string _menuContentType: "track"
+    property int _menuContentId: -1
+
+    function openTrackMenu(uid, trackId, row, title, contentType, contentId) {
         deselectTimer.stop()
         if (!selectedIds.has(uid))
             handleClick(uid, false, false)
@@ -777,6 +780,8 @@ Item {
         _menuTrackId = trackId
         _menuRow = row
         _menuTitle = title
+        _menuContentType = contentType || "track"
+        _menuContentId = contentId === undefined ? trackId : contentId
         _menuTrackIds = selectedTrackIds()
         _menuRows = selectedRows()
         _menuActions = (typeof pluginsVM !== "undefined" && pluginsVM && listVM
@@ -1685,7 +1690,11 @@ Item {
 
             function openMenu() {
                 root.openTrackMenu(rowItem.uid, Number(rowItem.trackId) || -1,
-                                   rowItem.index, rowItem.titleText)
+                                   rowItem.index, rowItem.titleText,
+                                   rowItem.isArtist ? "artist" : rowItem.isAlbum ? "album" : "track",
+                                   rowItem.isArtist ? Number(rowItem.model.artistId)
+                                       : rowItem.isAlbum ? Number(rowItem.model.albumId)
+                                       : Number(rowItem.trackId))
             }
 
             /* The bed the row is pulled off, in the hole it left.
@@ -2610,6 +2619,7 @@ Item {
 
     NocturneMenu {
         id: rowMenu
+        objectName: "trackContextMenu"
 
         MenuRow {
             text: root._idsForMenu().length > 1
@@ -2638,6 +2648,13 @@ Item {
             height: visible ? implicitHeight : 0
             enabled: root._idsForMenu().length > 0
             onTriggered: queueVM.appendEntries(root.entriesFor(root._idsForMenu()))
+        }
+
+        PinMenuRow {
+            contentType: root._menuContentType
+            contentId: root._menuContentId
+            eligible: root._rowsForMenu().length <= 1
+                && (contentType !== "track" || root._idsForMenu().length === 1)
         }
 
         MenuSeparator {

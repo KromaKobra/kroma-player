@@ -9,6 +9,8 @@ NocturneMenu {
     property int selectionCount: 1
     property bool playlist: false
     property bool inDetail: false
+    property string contentType: ""
+    property int contentId: -1
     signal openRequested()
     signal editRequested()
     signal renameRequested()
@@ -26,6 +28,11 @@ NocturneMenu {
     MenuRow {
         text: "Add to queue"; iconName: "plus"; enabled: root.entries.length > 0
         onTriggered: queueVM.appendEntries(root.entries)
+    }
+    PinMenuRow {
+        contentType: root.contentType
+        contentId: root.contentId
+        eligible: root.selectionCount === 1
     }
     MenuSeparator { visible: root.selectionCount === 1; height: visible ? implicitHeight : 0 }
     MenuRow {

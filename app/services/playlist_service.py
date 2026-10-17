@@ -48,9 +48,9 @@ class PlaylistService:
     # Reads
     # ------------------------------------------------------------------
 
-    def get_summaries(self) -> List[dict]:
-        """Return summary dicts for every playlist (for the grid)."""
-        summaries = self.playlist_repo.get_summaries()
+    def get_summaries(self, playlist_ids: Optional[List[int]] = None) -> List[dict]:
+        """Summary dicts for all playlists, or just the requested IDs."""
+        summaries = self.playlist_repo.get_summaries(playlist_ids)
         for summary in summaries:
             sources = summary.pop("cover_sources")
             own_cover = summary.pop("custom_cover_hash")

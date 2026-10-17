@@ -127,6 +127,8 @@ Item {
         cellMenu.entries = playlistsVM.playbackEntries([openId])
         cellMenu.selectionCount = 1
         cellMenu.inDetail = true
+        cellMenu.contentType = "playlist"
+        cellMenu.contentId = openId
         cellMenu.popup()
     }
 

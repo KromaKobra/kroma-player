@@ -1,9 +1,11 @@
 import QtQuick
 import QtQuick.Controls
 import Nocturne
+import "../artwork"
+import "../controls"
 
 // Presentation belongs here; navigation and persistence belong to the window.
-// The rail lists tabs only. A page opened inside a tab — an artist, an album,
+// A page opened inside a tab — an artist, an album,
 // an editor, a playlist — lights that tab rather than adding an entry of its
 // own; the window says which tab is current through `currentIndex`.
 Item {
@@ -18,6 +20,10 @@ Item {
     property Item headerHost: null
     readonly property Item headerToggle: toggleButton
     property bool headerHovered: false
+    property var pinModel: null
+    readonly property var pinnedItems: pinModel ? pinModel.items : []
+    property string activePinType: ""
+    property int activePinId: -1
     readonly property bool hovered: sidebarHover.hovered
 
     readonly property real minimumExpandedWidth: 200
@@ -35,6 +41,7 @@ Item {
 
     signal navigated(int index)
     signal libraryNavigated(int mode)
+    signal pinActivated(string contentType, int contentId)
 
     readonly property var mainItems: [
         // { view: 13, icon: "navHome", label: "Home" },
@@ -114,6 +121,7 @@ Item {
     // Preserve wheel-to-destination navigation, with trackpad throttling.
     WheelSteps {
         anchors.fill: parent
+        enabled: scroll.contentHeight <= scroll.height
         onStepped: function (delta) {
             if (root.currentSlot < 0) return
             var next = Math.max(0, Math.min(root.items.length - 1, root.currentSlot + delta))
@@ -189,6 +197,108 @@ Item {
             x: destination.width + 8
         }
     }
+    component PinnedDestination: Button {
+        id: pin
+        required property var entry
+        objectName: "pinned_" + entry.contentType + "_" + entry.contentId
+        x: 12; width: root.width - 24; height: 48
+        padding: 0
+        readonly property bool selected: root.activePinType === entry.contentType
+            && root.activePinId === entry.contentId
+        Accessible.name: entry.title + ", " + entry.subtitle
+        Accessible.checkable: true
+        Accessible.checked: selected
+        onClicked: root.pinActivated(entry.contentType, entry.contentId)
+        onActiveFocusChanged: if (activeFocus) {
+            var position = mapToItem(navigation, 0, 0).y
+            if (position < scroll.contentY) scroll.contentY = position
+            else if (position + height > scroll.contentY + scroll.height)
+                scroll.contentY = Math.max(0, position + height - scroll.height)
+        }
+        function openMenu() {
+            pinMenu.contentType = entry.contentType
+            pinMenu.contentId = entry.contentId
+            pinMenu.popup(pin, 0, height)
+        }
+        Keys.onMenuPressed: openMenu()
+        Keys.onPressed: function(event) {
+            if (event.key === Qt.Key_F10 && (event.modifiers & Qt.ShiftModifier)) {
+                openMenu()
+                event.accepted = true
+            }
+        }
+        TapHandler {
+            acceptedButtons: Qt.RightButton
+            onTapped: function(eventPoint) {
+                pinMenu.contentType = pin.entry.contentType
+                pinMenu.contentId = pin.entry.contentId
+                pinMenu.popup(pin, eventPoint.position)
+            }
+        }
+        background: Rectangle {
+            radius: 8
+            color: pin.down ? Theme.alpha(Theme.text, 0.13)
+                : pin.selected ? Theme.alpha(Theme.text, 0.09)
+                : pin.hovered ? Theme.alpha(Theme.text, 0.05) : "transparent"
+            border.width: pin.visualFocus ? 1 : 0
+            border.color: Theme.accent
+        }
+        contentItem: Item {
+            clip: true
+            CoverArt {
+                id: artwork
+                x: 4; anchors.verticalCenter: parent.verticalCenter
+                width: 32; height: 32
+                hash: pin.entry.coverHash
+                radius: pin.entry.contentType === "artist" ? 16 : 5
+                maskSource: pin.entry.contentType === "artist" ? roundPinMask : pinMask
+                showPlaceholderGlyph: false
+                Icon {
+                    anchors.centerIn: parent
+                    visible: !artwork.ready
+                    name: ({track: "navSong", album: "navAlbum", artist: "navArtist",
+                            playlist: "navPlaylist"})[pin.entry.contentType]
+                    size: 18; color: Theme.dim
+                }
+            }
+            Column {
+                x: 48; width: Math.max(0, parent.width - x - 8)
+                anchors.verticalCenter: parent.verticalCenter
+                opacity: root.labelOpacity
+                spacing: 2
+                Text {
+                    width: parent.width
+                    text: pin.entry.title; elide: Text.ElideRight
+                    font.family: Theme.fontFamily; font.pixelSize: Theme.fzBody
+                    font.weight: Font.Medium; color: Theme.text
+                }
+                Text {
+                    width: parent.width
+                    text: pin.entry.subtitle; elide: Text.ElideRight
+                    font.family: Theme.fontFamily; font.pixelSize: Theme.fzSmall
+                    color: Theme.dim
+                }
+            }
+        }
+        NocturneTooltip {
+            text: pin.entry.title + "\n" + pin.entry.subtitle
+            visible: pin.hovered
+            x: pin.width + 8
+        }
+    }
+    NocturneMenu {
+        id: pinMenu
+        objectName: "sidebarPinMenu"
+        property string contentType: ""
+        property int contentId: -1
+        MenuRow {
+            objectName: "unpinFromSidebar"
+            text: "Unpin from sidebar"; iconName: "pin"
+            onTriggered: if (root.pinModel) root.pinModel.unpin(pinMenu.contentType, pinMenu.contentId)
+        }
+    }
+    CornerMask { id: pinMask; width: 32; height: 32; radius: 5 }
+    CornerMask { id: roundPinMask; width: 32; height: 32; radius: 16 }
     Flickable {
         id: scroll
         anchors.top: parent.top
@@ -209,9 +319,22 @@ Item {
                     Destination { entry: modelData }
                 }
             }
-            Heading { text: "Pinned" }
+            Heading {
+                objectName: "pinnedHeading"
+                text: "PINNED"
+                visible: root.pinnedItems.length > 0
+            }
+            Repeater {
+                model: root.pinnedItems
+                delegate: PinnedDestination {
+                    required property var modelData
+                    entry: modelData
+                }
+            }
         }
+        onContentHeightChanged: contentY = Math.max(0, Math.min(contentY, contentHeight - height))
     }
+    SmoothWheel { target: scroll; enabled: scroll.contentHeight > scroll.height }
     Item {
         id: footer
         anchors.bottom: parent.bottom; width: parent.width; height: 57

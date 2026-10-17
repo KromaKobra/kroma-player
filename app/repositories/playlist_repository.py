@@ -243,44 +243,55 @@ class PlaylistRepository(BaseRepository[Playlist]):
         )
         return [r[0] for r in rows]
 
-    def get_summaries(self) -> List[dict]:
+    def get_summaries(self, playlist_ids: Optional[List[int]] = None) -> List[dict]:
         """Return one summary dict per playlist for the playlist grid.
 
         Aggregates and the leading four cover hashes are batched across playlists,
         so loading the grid uses three queries regardless of playlist count.
         Encoding derived artwork belongs to the service, never this repository.
+        ``playlist_ids`` restricts every query to a subset (e.g. sidebar pins).
 
         Returns:
             List of dicts ordered newest-first:
                 {id, name, description, cover_hash, track_count, total_duration,
                  created_at, updated_at}
         """
+        query = self.session.query(Playlist)
+        if playlist_ids is not None:
+            if not playlist_ids:
+                return []
+            query = query.filter(Playlist.id.in_(playlist_ids))
         playlists = (
-            self.session.query(Playlist)
+            query
             .order_by(Playlist.created_at.desc(), Playlist.id.desc())
             .all()
         )
 
-        aggregates = {
-            row[0]: (row[1], row[2]) for row in (
-                self.session.query(
-                    PlaylistTrack.playlist_id,
-                    func.count(PlaylistTrack.id),
-                    func.coalesce(func.sum(Track.duration_seconds), 0),
-                )
-                .select_from(PlaylistTrack)
-                .join(Track, Track.id == PlaylistTrack.track_id)
-                .group_by(PlaylistTrack.playlist_id)
-                .all()
+        aggregate_query = (
+            self.session.query(
+                PlaylistTrack.playlist_id,
+                func.count(PlaylistTrack.id),
+                func.coalesce(func.sum(Track.duration_seconds), 0),
             )
+            .select_from(PlaylistTrack)
+            .join(Track, Track.id == PlaylistTrack.track_id)
+        )
+        if playlist_ids is not None:
+            aggregate_query = aggregate_query.filter(PlaylistTrack.playlist_id.in_(playlist_ids))
+        aggregates = {
+            row[0]: (row[1], row[2])
+            for row in aggregate_query.group_by(PlaylistTrack.playlist_id).all()
         }
-        ranked = select(
+        ranked_query = select(
             PlaylistTrack.playlist_id, Track.cover_hash,
             func.row_number().over(
                 partition_by=PlaylistTrack.playlist_id,
                 order_by=(PlaylistTrack.position, PlaylistTrack.id),
             ).label("rank"),
-        ).join(Track, Track.id == PlaylistTrack.track_id).subquery()
+        ).join(Track, Track.id == PlaylistTrack.track_id)
+        if playlist_ids is not None:
+            ranked_query = ranked_query.where(PlaylistTrack.playlist_id.in_(playlist_ids))
+        ranked = ranked_query.subquery()
         leading: dict[int, list] = {}
         for playlist_id, cover_hash in self.session.execute(
             select(ranked.c.playlist_id, ranked.c.cover_hash)

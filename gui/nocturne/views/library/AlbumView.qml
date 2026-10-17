@@ -169,6 +169,8 @@ Item {
         id: albumMenu
         objectName: "albumMenu"
 
+        PinMenuRow { contentType: "album"; contentId: root.albumId }
+
         MenuRow {
             objectName: "albumEdit"
             text: "Edit album…"
