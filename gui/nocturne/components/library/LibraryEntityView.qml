@@ -139,6 +139,7 @@ Item {
         model: root.model
         delegate: root.delegate
         viewObjectName: root.viewKey + "CollectionView"
+        scrollBarInset: Theme.gapXl
         listMode: !Theme.prefs[root.viewKey + "Grid"]
         compact: Theme.prefs[root.viewKey + "Compact"]
         tileSize: root.tileSize

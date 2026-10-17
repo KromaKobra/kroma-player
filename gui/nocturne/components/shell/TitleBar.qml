@@ -233,7 +233,7 @@ Item {
             id: historyList
             clip: true
             model: history.visible ? root.historyEntries.slice().reverse() : []
-            ScrollBar.vertical: ScrollBar { width: 6 }
+            ScrollBar.vertical: EdgeScrollBar {}
             delegate: ItemDelegate {
                 id: entry
                 required property var modelData

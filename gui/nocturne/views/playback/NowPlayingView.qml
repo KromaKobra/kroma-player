@@ -803,7 +803,7 @@ Item {
                         highlightMoveDuration: Theme.slow
                         highlightMoveVelocity: -1
 
-                        ScrollBar.vertical: ScrollBar { width: 6 }
+                        ScrollBar.vertical: EdgeScrollBar {}
 
                         delegate: Item {
                             id: lyricRow
@@ -883,7 +883,7 @@ Item {
                         clip: true
                         boundsBehavior: Flickable.StopAtBounds
 
-                        ScrollBar.vertical: ScrollBar { width: 6 }
+                        ScrollBar.vertical: EdgeScrollBar {}
 
                         Text {
                             id: plainLyrics
@@ -939,7 +939,7 @@ Item {
                         model: draftModel
                         spacing: 4
 
-                        ScrollBar.vertical: ScrollBar { width: 6 }
+                        ScrollBar.vertical: EdgeScrollBar {}
 
                         // A row lifted out of the list sits above the rest and
                         // does not animate — it is under the cursor, and
@@ -1268,7 +1268,7 @@ Item {
                     spacing: 2
                     model: queueVM
 
-                    ScrollBar.vertical: ScrollBar { width: 6 }
+                    ScrollBar.vertical: EdgeScrollBar {}
 
                     delegate: Item {
                         id: nextRow

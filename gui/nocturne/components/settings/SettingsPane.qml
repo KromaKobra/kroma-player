@@ -110,17 +110,16 @@ Item {
     Flickable {
         id: flick
         anchors.fill: parent
-        anchors.leftMargin: 24
-        anchors.rightMargin: 24
         contentHeight: column.implicitHeight + Theme.gapXl
         clip: true
         boundsBehavior: Flickable.StopAtBounds
 
-        ScrollBar.vertical: ScrollBar { width: 7 }
+        ScrollBar.vertical: EdgeScrollBar {}
 
         Column {
             id: column
-            width: Math.min(flick.width, 860)
+            x: 24
+            width: Math.min(flick.width - 48, 860)
             spacing: 26
 
             Column {

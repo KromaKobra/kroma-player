@@ -20,10 +20,14 @@ Item {
                                     && targetWindow.visibility !== Window.FullScreen
 
     component Grip: MouseArea {
+        id: gripArea
         property int edges: 0
         enabled: root.allowed
         visible: root.allowed
         acceptedButtons: Qt.LeftButton
+        containmentMask: QtObject {
+            function contains(point: point): bool { return ScrollBarPriority.resizeContains(gripArea, point) }
+        }
         onPressed: if (root.targetWindow) root.targetWindow.startSystemResize(edges)
     }
 

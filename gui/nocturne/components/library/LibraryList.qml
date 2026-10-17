@@ -7,6 +7,7 @@ import "../artwork"
 ListView {
     id: root
     property var controller: null
+    property real scrollBarInset: 0
     property bool compact: false
     property int rowHeight: compact ? 44 : 68
     property int artworkPadding: 8
@@ -34,6 +35,14 @@ ListView {
         height: width
         radius: root.roundArtwork ? width / 2 : root.artworkRadius
     }
-    ScrollBar.vertical: ScrollBar { width: 7 }
+    // Outside the clipped viewport so a padded list can still reach the edge.
+    ScrollBar.vertical: EdgeScrollBar {
+        parent: root.parent
+        anchors.top: root.top
+        anchors.bottom: root.bottom
+        anchors.right: root.right
+        anchors.rightMargin: -root.scrollBarInset
+        visible: root.visible && needed
+    }
     SmoothWheel { id: wheel; target: root; visible: root.visible }
 }

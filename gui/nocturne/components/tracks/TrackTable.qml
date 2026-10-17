@@ -1320,23 +1320,6 @@ Item {
             _lastOriginY = originY
         }
 
-        ScrollBar.vertical: ScrollBar {
-            id: bar
-            policy: ScrollBar.AsNeeded
-            width: 9
-            anchors.right: parent.right
-            anchors.rightMargin: 2
-            contentItem: Rectangle {
-                implicitWidth: 5
-                radius: 3
-                color: bar.pressed ? Theme.alpha(Theme.text, 0.5)
-                     : (bar.hovered ? Theme.alpha(Theme.text, 0.34)
-                                    : Theme.alpha(Theme.text, 0.18))
-                Behavior on color { ColorAnimation { duration: Theme.fast } }
-            }
-            background: Item {}
-        }
-
         delegate: root.gridMode ? null : trackRowDelegate
 
         property Component trackRowDelegate: Item {
@@ -2503,6 +2486,7 @@ Item {
         onLoaded: root._pushVisibleRange()
         sourceComponent: LibraryGrid {
             objectName: "songGridView"
+            scrollBarInset: root.sideMargin
             controller: root
             labelHeight: 54
             delegate: SongTile { table: root }

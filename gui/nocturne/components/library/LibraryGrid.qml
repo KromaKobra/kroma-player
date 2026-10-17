@@ -7,6 +7,7 @@ import "../artwork"
 GridView {
     id: root
     property var controller: null
+    property real scrollBarInset: 0
     property int tileSize: 200
     property int artworkPadding: Theme.gapSm
     property int labelHeight: 48
@@ -90,6 +91,14 @@ GridView {
         targetHeight: root.artSize
         radius: root.roundArtwork ? width / 2 : root.artworkRadius
     }
-    ScrollBar.vertical: ScrollBar { width: 7 }
+    // Outside the clipped viewport so a padded grid can still reach the edge.
+    ScrollBar.vertical: EdgeScrollBar {
+        parent: root.parent
+        anchors.top: root.top
+        anchors.bottom: root.bottom
+        anchors.right: root.right
+        anchors.rightMargin: -root.scrollBarInset
+        visible: root.visible && needed
+    }
     SmoothWheel { target: root; visible: root.visible }
 }

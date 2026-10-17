@@ -102,7 +102,7 @@ Popup {
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
 
-                ScrollBar.vertical: ScrollBar { width: 7 }
+                ScrollBar.vertical: EdgeScrollBar {}
 
                 Text {
                     id: terms

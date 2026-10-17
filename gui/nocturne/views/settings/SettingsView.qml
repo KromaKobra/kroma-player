@@ -238,12 +238,12 @@ Item {
     ScrollView {
         visible: searchField.text.trim() !== ""
         anchors.fill: pages
-        anchors.leftMargin: 24
-        anchors.rightMargin: 24
         clip: true
         contentWidth: availableWidth
+        ScrollBar.vertical: EdgeScrollBar {}
         Column {
-            width: parent.width
+            x: 24
+            width: parent.width - 48
             spacing: 12
             Text {
                 text: root.searchResults.length ? root.searchResults.length + " results" : "No settings found"

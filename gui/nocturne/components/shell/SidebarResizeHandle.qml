@@ -48,6 +48,9 @@ MouseArea {
     preventStealing: true
     acceptedButtons: Qt.LeftButton
     cursorShape: Qt.SizeHorCursor
+    containmentMask: QtObject {
+        function contains(point: point): bool { return ScrollBarPriority.resizeContains(root, point) }
+    }
     Accessible.role: Accessible.Grip
     Accessible.name: rightSidebar ? "Resize details sidebar" : "Resize navigation sidebar"
     Accessible.description: "Drag to resize, collapse, or expand the sidebar"

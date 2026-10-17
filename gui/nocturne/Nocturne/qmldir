@@ -6,6 +6,7 @@ singleton Fmt   1.0 Fmt.qml
 singleton TrackSelection 1.0 TrackSelection.qml
 singleton Clipboard 1.0 Clipboard.qml
 singleton LiveResize 1.0 LiveResize.qml
+singleton ScrollBarPriority 1.0 ScrollBarPriority.qml
 
 Icon             1.0 Icon.qml
 IconButton       1.0 IconButton.qml
@@ -13,4 +14,5 @@ NocturneTooltip  1.0 NocturneTooltip.qml
 Pill             1.0 Pill.qml
 SizeWhileVisible 1.0 SizeWhileVisible.qml
 SmoothWheel      1.0 SmoothWheel.qml
+EdgeScrollBar    1.0 EdgeScrollBar.qml
 WheelSteps       1.0 WheelSteps.qml

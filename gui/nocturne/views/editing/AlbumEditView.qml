@@ -135,19 +135,18 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.leftMargin: Theme.gapXl
-        anchors.rightMargin: Theme.gapXl
         anchors.bottomMargin: Theme.gap
         visible: albumVM.hasAlbum
         clip: true
         contentHeight: form.implicitHeight + Theme.gapLg
         boundsBehavior: Flickable.StopAtBounds
 
-        ScrollBar.vertical: ScrollBar { width: 7 }
+        ScrollBar.vertical: EdgeScrollBar {}
 
         Column {
             id: form
-            width: flick.width
+            x: Theme.gapXl
+            width: flick.width - 2 * Theme.gapXl
             spacing: Theme.gap
 
             // ------------------------------------------- identity card

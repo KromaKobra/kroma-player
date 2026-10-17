@@ -106,7 +106,7 @@ Popup {
             model: root._playlists
             spacing: 2
 
-            ScrollBar.vertical: ScrollBar { width: 6 }
+            ScrollBar.vertical: EdgeScrollBar {}
 
             delegate: Rectangle {
                 id: plRow

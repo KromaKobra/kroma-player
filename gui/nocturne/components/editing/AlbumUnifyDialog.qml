@@ -254,7 +254,7 @@ Popup {
             model: root._rows()
             spacing: 2
 
-            ScrollBar.vertical: ScrollBar { width: 6 }
+            ScrollBar.vertical: EdgeScrollBar {}
 
             delegate: CheckRow {
                 required property var modelData

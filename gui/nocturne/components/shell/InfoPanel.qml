@@ -54,7 +54,7 @@ Item {
         clip: true
         boundsBehavior: Flickable.StopAtBounds
 
-        ScrollBar.vertical: ScrollBar { width: 6 }
+        ScrollBar.vertical: EdgeScrollBar {}
 
         Column {
             id: content

@@ -319,7 +319,13 @@ Item {
         spacing: 2
         model: backingVM
 
-        ScrollBar.vertical: ScrollBar { width: 7 }
+        ScrollBar.vertical: EdgeScrollBar {
+            parent: jobList.parent
+            anchors.top: jobList.top
+            anchors.bottom: jobList.bottom
+            anchors.right: parent.right
+            visible: jobList.visible && needed
+        }
 
         delegate: Rectangle {
             id: jobRow

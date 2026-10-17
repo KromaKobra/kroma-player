@@ -253,7 +253,7 @@ Item {
         contentWidth: width
         contentHeight: root.extent * root.pxPerSec
 
-        ScrollBar.vertical: ScrollBar { width: 6 }
+        ScrollBar.vertical: EdgeScrollBar {}
 
         onContentYChanged: {
             if (root._adjusting > 0)

@@ -196,7 +196,7 @@ Item {
         anchors.bottom: footer.top; anchors.bottomMargin: 8
         width: parent.width; contentHeight: navigation.height
         clip: true; interactive: false; boundsBehavior: Flickable.StopAtBounds
-        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+        ScrollBar.vertical: EdgeScrollBar {}
         Column {
             id: navigation
             width: scroll.width; spacing: 1
