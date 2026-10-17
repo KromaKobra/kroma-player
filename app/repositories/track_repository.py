@@ -35,6 +35,7 @@ from app.models.track import (
     track_genres_association,
 )
 from app.repositories.base_repository import BaseRepository
+from app.repositories.playlist_repository import PlaylistRepository
 from app.search.search_query import AdvancedSearchFilter, SearchField, SearchOperator
 
 # SQLite's default host-parameter limit is 999; stay well under it when
@@ -142,6 +143,11 @@ class TrackRepository(BaseRepository[Track]):
             session: SQLAlchemy session for database access
         """
         super().__init__(session, Track)
+
+    def delete(self, id: int) -> bool:
+        """Delete a track and record the resulting playlist membership changes."""
+        PlaylistRepository(self.session).touch_for_track_removal(id)
+        return super().delete(id)
 
     def tracks_at_durations(
         self, durations: Iterable[int]

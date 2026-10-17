@@ -50,7 +50,7 @@ _ROLE_NAMES: dict[int, bytes] = {
 
 
 class PlaylistsViewModel(CollectionListModel):
-    """List model exposing every playlist (newest first by default)."""
+    """List model exposing every playlist (most recently modified first by default)."""
 
     entity_kind = "playlist"
 
@@ -64,7 +64,7 @@ class PlaylistsViewModel(CollectionListModel):
         super().__init__(parent)
         self._service = playlist_service
         self._rows: List[dict] = []
-        self._sort_field = "dateAdded"
+        self._sort_field = "recentlyModified"
         self._sort_ascending = False
 
         for evt in (
@@ -113,7 +113,8 @@ class PlaylistsViewModel(CollectionListModel):
         return self._sort_field
 
     def _set_sort_field(self, value: str) -> None:
-        value = value if value in {"name", "trackCount", "dateAdded", "totalDuration"} else "dateAdded"
+        if value not in {"name", "trackCount", "dateAdded", "recentlyModified", "totalDuration"}:
+            value = "recentlyModified"
         if value != self._sort_field:
             self._sort_field = value
             self._resort()
@@ -141,6 +142,7 @@ class PlaylistsViewModel(CollectionListModel):
         self._sort_rows_by({
             "name": "name", "trackCount": "track_count",
             "dateAdded": "created_at", "totalDuration": "total_duration",
+            "recentlyModified": "updated_at",
         })
 
     def _resort(self) -> None:

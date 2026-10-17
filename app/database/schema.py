@@ -381,6 +381,24 @@ def _v7_external_id_tables(conn: Connection) -> None:
             )
 
 
+def _v8_playlist_modified_time(conn: Connection) -> None:
+    """Convert playlist modification dates to Unix microseconds.
+
+    Old dates have day precision only; retain that history at midnight UTC.
+    Precise timestamps are already larger than any YYYYMMDD date, so this is
+    safe to repeat and never overwrites a subsequent edit.
+    """
+    conn.execute(text(
+        "UPDATE playlists SET updated_at = COALESCE("
+        "CAST(strftime('%s', "
+        "substr(COALESCE(updated_at, created_at), 1, 4) || '-' || "
+        "substr(COALESCE(updated_at, created_at), 5, 2) || '-' || "
+        "substr(COALESCE(updated_at, created_at), 7, 2)"
+        ") AS INTEGER) * 1000000, 0) "
+        "WHERE updated_at IS NULL OR updated_at BETWEEN 10000101 AND 99991231"
+    ))
+
+
 MIGRATIONS: Sequence[Migration] = (
     Migration(1, "artist youtube_id + image_hash, artist lookup indexes", _v1_artist_identity),
     Migration(2, "per-track artist credit order", _v2_artist_credit_order),
@@ -389,6 +407,7 @@ MIGRATIONS: Sequence[Migration] = (
     Migration(5, "album completeness flag", _v5_album_completeness),
     Migration(6, "per-track instrumental YouTube id", _v6_instrumental_youtube_id),
     Migration(7, "external ids move from fixed columns to tables of their own", _v7_external_id_tables),
+    Migration(8, "precise playlist modification times", _v8_playlist_modified_time),
 )
 
 SCHEMA_VERSION: int = MIGRATIONS[-1].version if MIGRATIONS else 0

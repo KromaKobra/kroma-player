@@ -23,6 +23,7 @@ Design notes:
   ``create_schema()`` creates their tables automatically.
 """
 from datetime import datetime
+from time import time_ns
 
 from sqlalchemy import Column, Integer, String, ForeignKey, Index
 from sqlalchemy.orm import relationship
@@ -33,6 +34,11 @@ from app.models.track import Base
 def _today_int() -> int:
     """Return today's date as a YYYYMMDD integer (matches Track.created_at)."""
     return int(datetime.utcnow().strftime("%Y%m%d"))
+
+
+def _now_us() -> int:
+    """UTC Unix time in microseconds, so same-day edits sort independently."""
+    return time_ns() // 1_000
 
 
 class Playlist(Base):
@@ -49,7 +55,8 @@ class Playlist(Base):
         description: Optional freeform notes.
         cover_hash: Optional content address into the cover cache (covers.db). When
             null, the UI falls back to the first track's artwork.
-        created_at / updated_at: YYYYMMDD integers, used for sorting in the grid.
+        created_at: Creation date as a YYYYMMDD integer.
+        updated_at: Last modification as Unix microseconds, used for sorting.
 
     Relationships:
         entries: ordered PlaylistTrack rows (ordered by position). Deleting the
@@ -62,7 +69,7 @@ class Playlist(Base):
     description = Column(String)
     cover_hash = Column(String(32))
     created_at = Column(Integer, default=_today_int)
-    updated_at = Column(Integer, default=_today_int)
+    updated_at = Column(Integer, default=_now_us)
 
     entries = relationship(
         'PlaylistTrack',

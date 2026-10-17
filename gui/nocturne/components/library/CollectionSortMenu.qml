@@ -35,6 +35,16 @@ NocturneMenu {
         onTriggered: Theme.prefs[root.viewKey + "Sort"] = "dateAdded"
     }
     MenuRow {
+        objectName: root.viewKey + "Sort_recentlyModified"
+        text: "Recently modified"
+        visible: root.viewKey === "playlist"; height: visible ? implicitHeight : 0
+        iconName: Theme.prefs[root.viewKey + "Sort"] === "recentlyModified" ? "check" : ""
+        onTriggered: {
+            Theme.prefs[root.viewKey + "SortAsc"] = false
+            Theme.prefs[root.viewKey + "Sort"] = "recentlyModified"
+        }
+    }
+    MenuRow {
         objectName: root.viewKey + "Sort_totalDuration"
         text: "Total time"
         iconName: Theme.prefs[root.viewKey + "Sort"] === "totalDuration" ? "check" : ""

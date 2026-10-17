@@ -83,7 +83,14 @@ def test_collections_sort_from_their_own_button_in_both_layouts(qt_app, backend,
             open_menu(window, key)
             click(window, item(window, key + "LayoutOption"))
         assert button.isVisible()
-        for field in ("name", "trackCount", "dateAdded"):
+        fields = ["name", "trackCount", "dateAdded"]
+        if key == "playlist":
+            fields.append("recentlyModified")
+        for field in fields:
+            if field == "recentlyModified":
+                click(window, button)
+                click(window, item(window, key + "SortAscending"))
+                assert model.sortAscending
             button.forceActiveFocus(Qt.TabFocusReason)
             QTest.keyClick(window, Qt.Key_Space)
             QTest.qWait(160)
@@ -92,6 +99,9 @@ def test_collections_sort_from_their_own_button_in_both_layouts(qt_app, backend,
             click(window, item(window, key + "Sort_" + field))
             assert model.sortField == field
             assert settings.value(key + "Sort", None) == field
+            if field == "recentlyModified":
+                assert not model.sortAscending
+                assert settings.value(key + "SortAsc", None) is False
         for ascending in (True, False):
             click(window, button)
             click(window, item(window, key + "Sort" + ("Ascending" if ascending else "Descending")))

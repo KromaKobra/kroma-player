@@ -87,7 +87,7 @@ QtObject {
         property bool albumSortAsc: SettingsStore.value("albumSortAsc", false)
         onAlbumSortAscChanged: if (root._ready) SettingsStore.setValue("albumSortAsc", albumSortAsc)
 
-        property string playlistSort: SettingsStore.value("playlistSort", "dateAdded")
+        property string playlistSort: SettingsStore.value("playlistSort", "recentlyModified")
         onPlaylistSortChanged: if (root._ready) SettingsStore.setValue("playlistSort", playlistSort)
 
         property bool playlistSortAsc: SettingsStore.value("playlistSortAsc", false)

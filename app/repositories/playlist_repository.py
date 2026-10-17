@@ -23,7 +23,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.track import Track
-from app.models.playlist import Playlist, PlaylistTrack, _today_int
+from app.models.playlist import Playlist, PlaylistTrack, _now_us
 from app.repositories.base_repository import BaseRepository
 
 
@@ -33,6 +33,32 @@ class PlaylistRepository(BaseRepository[Playlist]):
     def __init__(self, session: Session):
         super().__init__(session, Playlist)
 
+    def _next_modified_at(self) -> int:
+        """Keep edits ordered even if the clock repeats or moves backwards."""
+        latest = self.session.query(func.max(Playlist.updated_at)).scalar() or 0
+        return max(_now_us(), latest + 1)
+
+    def _touch(self, playlist_id: int) -> None:
+        playlist = self.get_by_id(playlist_id)
+        if playlist is not None:
+            playlist.updated_at = self._next_modified_at()
+
+    def touch_for_track_removal(self, track_id: int) -> None:
+        """Mark playlists before a library deletion cascades their entries away.
+
+        The caller commits this together with the track deletion.
+        """
+        playlists = (
+            self.session.query(Playlist)
+            .join(PlaylistTrack, PlaylistTrack.playlist_id == Playlist.id)
+            .filter(PlaylistTrack.track_id == track_id)
+            .all()
+        )
+        if playlists:
+            modified_at = self._next_modified_at()
+            for playlist in playlists:
+                playlist.updated_at = modified_at
+
     # ------------------------------------------------------------------
     # Playlist CRUD
     # ------------------------------------------------------------------
@@ -40,7 +66,8 @@ class PlaylistRepository(BaseRepository[Playlist]):
     def create_playlist(self, name: str, description: str = "") -> Playlist:
         """Create a new (empty) playlist and return it with its generated id."""
         playlist = Playlist(name=name.strip() or "Untitled Playlist",
-                            description=(description or "").strip() or None)
+                            description=(description or "").strip() or None,
+                            updated_at=self._next_modified_at())
         self.session.add(playlist)
         self.session.commit()
         return playlist
@@ -50,8 +77,11 @@ class PlaylistRepository(BaseRepository[Playlist]):
         playlist = self.get_by_id(playlist_id)
         if playlist is None:
             return None
-        playlist.name = name.strip() or playlist.name  # type: ignore[assignment]
-        playlist.updated_at = _today_int()  # type: ignore[assignment]
+        new_name = name.strip() or playlist.name
+        if new_name == playlist.name:
+            return playlist
+        playlist.name = new_name  # type: ignore[assignment]
+        self._touch(playlist_id)
         self.session.commit()
         return playlist
 
@@ -90,6 +120,7 @@ class PlaylistRepository(BaseRepository[Playlist]):
         self.session.add(
             PlaylistTrack(playlist_id=playlist_id, track_id=track_id, position=next_pos)
         )
+        self._touch(playlist_id)
         self.session.commit()
         return True
 
@@ -103,6 +134,7 @@ class PlaylistRepository(BaseRepository[Playlist]):
         if entry is None:
             return False
         self.session.delete(entry)
+        self._touch(playlist_id)
         self.session.commit()
         return True
 
@@ -134,6 +166,7 @@ class PlaylistRepository(BaseRepository[Playlist]):
         removed = [entry.track_id for entry in entries]
         for entry in entries:
             self.session.delete(entry)
+        self._touch(playlist_id)
         self.session.commit()
         return removed
 
@@ -177,6 +210,7 @@ class PlaylistRepository(BaseRepository[Playlist]):
                 entry.position = position
                 changed = True
         if changed:
+            self._touch(playlist_id)
             self.session.commit()
         return changed
 
