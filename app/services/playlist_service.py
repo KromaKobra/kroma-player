@@ -23,6 +23,7 @@ from app.models.playlist import Playlist
 from app.models.track import Track
 from app.repositories.playlist_repository import PlaylistRepository
 from app.events.event_bus import EventBus
+from app.artwork.cover_store import CoverStore
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +31,18 @@ logger = logging.getLogger(__name__)
 class PlaylistService:
     """Orchestrates playlist operations with event emission and logging."""
 
-    def __init__(self, playlist_repo: PlaylistRepository, event_bus: EventBus):
+    def __init__(self, playlist_repo: PlaylistRepository, event_bus: EventBus,
+                 cover_store: CoverStore | None = None):
         self.playlist_repo = playlist_repo
         self.event_bus = event_bus
+        self._artwork = None
+        if cover_store is not None:
+            from app.artwork.playlist_artwork import PlaylistArtwork
+            self._artwork = PlaylistArtwork(cover_store, playlist_repo, event_bus)
+
+    def shutdown(self) -> None:
+        if self._artwork is not None:
+            self._artwork.shutdown()
 
     # ------------------------------------------------------------------
     # Reads
@@ -40,7 +50,15 @@ class PlaylistService:
 
     def get_summaries(self) -> List[dict]:
         """Return summary dicts for every playlist (for the grid)."""
-        return self.playlist_repo.get_summaries()
+        summaries = self.playlist_repo.get_summaries()
+        for summary in summaries:
+            sources = summary.pop("cover_sources")
+            own_cover = summary.pop("custom_cover_hash")
+            if self._artwork is not None:
+                summary["cover_hash"] = self._artwork.resolve(
+                    summary["id"], sources, own_cover,
+                )
+        return summaries
 
     def get_tracks(self, playlist_id: int) -> List[Track]:
         """Return a playlist's tracks in order (artists/genres eager-loaded)."""
@@ -55,8 +73,14 @@ class PlaylistService:
         return self.playlist_repo.get_by_id(playlist_id)
 
     def get_cover_hash(self, playlist_id: int) -> Optional[str]:
-        """Return one playlist's resolved cover hash (own cover, else first track's)."""
-        return self.playlist_repo.get_cover_hash(playlist_id)
+        """Resolve custom art, a cached four-track grid, or the first track's art."""
+        if self._artwork is None:
+            return self.playlist_repo.get_cover_hash(playlist_id)
+        playlist = self.playlist_repo.get_by_id(playlist_id)
+        return self._artwork.resolve(
+            playlist_id, self.playlist_repo.get_cover_sources(playlist_id) if playlist else [],
+            playlist.cover_hash if playlist else None,
+        )
 
     # ------------------------------------------------------------------
     # Mutations
@@ -82,6 +106,8 @@ class PlaylistService:
         """Delete a playlist and emit ``playlist.deleted``."""
         if not self.playlist_repo.delete_playlist(playlist_id):
             return False
+        if self._artwork is not None:
+            self._artwork.release(playlist_id)
         self.event_bus.emit('playlist.deleted', playlist_id)
         logger.info(f"Playlist deleted: ID {playlist_id}")
         return True

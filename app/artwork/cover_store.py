@@ -62,6 +62,14 @@ class CoverStore:
             )
             """
         )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS playlist_covers ("
+            "playlist_id INTEGER PRIMARY KEY, cover_hash TEXT NOT NULL)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS ix_playlist_covers_hash "
+            "ON playlist_covers (cover_hash)"
+        )
         conn.commit()
 
     # ------------------------------------------------------------------
@@ -105,9 +113,58 @@ class CoverStore:
         """
         conn = self._conn()
         existing = {row[0] for row in conn.execute("SELECT DISTINCT cover_hash FROM covers")}
-        orphans = existing - valid_hashes
+        # Generated playlist art is derived metadata owned by this cache rather
+        # than a custom cover in tracks.db. It participates in every sweep.
+        playlist_hashes = {row[0] for row in conn.execute(
+            "SELECT DISTINCT cover_hash FROM playlist_covers"
+        )}
+        orphans = existing - valid_hashes - playlist_hashes
         if not orphans:
             return 0
-        conn.executemany("DELETE FROM covers WHERE cover_hash = ?", [(h,) for h in orphans])
+        conn.executemany(
+            "DELETE FROM covers WHERE cover_hash = ? AND NOT EXISTS "
+            "(SELECT 1 FROM playlist_covers WHERE cover_hash = ?)",
+            [(h, h) for h in orphans],
+        )
         conn.commit()
         return len(orphans)
+
+    def playlist_cover(self, playlist_id: int) -> str | None:
+        row = self._conn().execute(
+            "SELECT cover_hash FROM playlist_covers WHERE playlist_id = ?",
+            (playlist_id,),
+        ).fetchone()
+        return row[0] if row else None
+
+    def set_playlist_cover(
+        self, playlist_id: int, cover_hash: str, tiers: dict[int, bytes],
+    ) -> None:
+        """Publish both tiers and their playlist reference atomically."""
+        conn = self._conn()
+        with conn:
+            conn.executemany(
+                "INSERT OR IGNORE INTO covers "
+                "(cover_hash, size, format, data, created_at) VALUES (?, ?, 'avif', ?, ?)",
+                [(cover_hash, size, data, int(time.time())) for size, data in tiers.items()],
+            )
+            conn.execute(
+                "INSERT OR REPLACE INTO playlist_covers (playlist_id, cover_hash) VALUES (?, ?)",
+                (playlist_id, cover_hash),
+            )
+
+    def remove_playlist_cover(self, playlist_id: int) -> None:
+        with self._conn() as conn:
+            conn.execute("DELETE FROM playlist_covers WHERE playlist_id = ?", (playlist_id,))
+
+    def delete_unreferenced_playlist_cover(self, cover_hash: str) -> None:
+        """Delete retired tiles unless another generated playlist still uses them.
+
+        The caller first checks references in tracks.db (tracks, albums, artists
+        and custom playlist covers). This targets one hash, avoiding a full sweep.
+        """
+        with self._conn() as conn:
+            conn.execute(
+                "DELETE FROM covers WHERE cover_hash = ? AND NOT EXISTS "
+                "(SELECT 1 FROM playlist_covers WHERE cover_hash = ?)",
+                (cover_hash, cover_hash),
+            )

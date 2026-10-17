@@ -7,6 +7,7 @@ This package owns everything related to cover artwork:
 - ``cover_service``  — orchestration: turn a source image (or an Opus file) into
                        deduplicated thumbnails and return a stable ``cover_hash``.
 - ``cover_provider`` — Qt ``QQuickImageProvider`` that serves thumbnails to QML.
+- ``playlist_artwork`` — background four-track grids, shared and cached in covers.db.
 - ``local_art_provider`` — the same for art embedded in files being imported,
                        which are not in the library yet and so have no hash.
 
@@ -28,6 +29,8 @@ Design contract
   one of their album covers shares that row — and is why deciding a hash is dead
   means asking every table that names one. See
   ``TrackService._referenced_cover_hashes``.
+  Generated playlist grids also have references inside ``covers.db``; the store
+  preserves these during a sweep and retires them when the last playlist changes.
 * Sizes are fixed tiers (``THUMB_SIZE`` for list rows, ``LARGE_SIZE`` for the
   now-playing panel). The full-resolution master is never cached here.
 """

@@ -19,10 +19,10 @@ Design:
 """
 from typing import List, Optional
 
-from sqlalchemy import func
+from sqlalchemy import func, select, union_all
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.track import Track
+from app.models.track import Album, Artist, Track
 from app.models.playlist import Playlist, PlaylistTrack, _now_us
 from app.repositories.base_repository import BaseRepository
 
@@ -246,10 +246,9 @@ class PlaylistRepository(BaseRepository[Playlist]):
     def get_summaries(self) -> List[dict]:
         """Return one summary dict per playlist for the playlist grid.
 
-        Each summary carries derived aggregates (track_count, total_duration) and a
-        resolved cover hash: the playlist's own cover if set, otherwise the first
-        track's artwork. Aggregates are derived here rather than stored, so they are
-        always current.
+        Aggregates and the leading four cover hashes are batched across playlists,
+        so loading the grid uses three queries regardless of playlist count.
+        Encoding derived artwork belongs to the service, never this repository.
 
         Returns:
             List of dicts ordered newest-first:
@@ -262,24 +261,45 @@ class PlaylistRepository(BaseRepository[Playlist]):
             .all()
         )
 
-        summaries: List[dict] = []
-        for pl in playlists:
-            count, duration = (
+        aggregates = {
+            row[0]: (row[1], row[2]) for row in (
                 self.session.query(
+                    PlaylistTrack.playlist_id,
                     func.count(PlaylistTrack.id),
                     func.coalesce(func.sum(Track.duration_seconds), 0),
                 )
                 .select_from(PlaylistTrack)
                 .join(Track, Track.id == PlaylistTrack.track_id)
-                .filter(PlaylistTrack.playlist_id == pl.id)
-                .one()
+                .group_by(PlaylistTrack.playlist_id)
+                .all()
             )
+        }
+        ranked = select(
+            PlaylistTrack.playlist_id, Track.cover_hash,
+            func.row_number().over(
+                partition_by=PlaylistTrack.playlist_id,
+                order_by=(PlaylistTrack.position, PlaylistTrack.id),
+            ).label("rank"),
+        ).join(Track, Track.id == PlaylistTrack.track_id).subquery()
+        leading: dict[int, list] = {}
+        for playlist_id, cover_hash in self.session.execute(
+            select(ranked.c.playlist_id, ranked.c.cover_hash)
+            .where(ranked.c.rank <= 4)
+            .order_by(ranked.c.playlist_id, ranked.c.rank)
+        ):
+            leading.setdefault(playlist_id, []).append(cover_hash)
 
+        summaries: List[dict] = []
+        for pl in playlists:
+            count, duration = aggregates.get(pl.id, (0, 0))
+            sources = leading.get(pl.id, [])
             summaries.append({
                 "id": pl.id,
                 "name": pl.name,
                 "description": pl.description or "",
-                "cover_hash": self._resolve_cover_hash(pl),
+                "cover_hash": pl.cover_hash or (sources[0] if sources else None),
+                "custom_cover_hash": pl.cover_hash,
+                "cover_sources": sources,
                 "track_count": int(count or 0),
                 "total_duration": int(duration or 0),
                 "created_at": pl.created_at,
@@ -300,14 +320,30 @@ class PlaylistRepository(BaseRepository[Playlist]):
         """The playlist's own cover if set, otherwise its first track's artwork."""
         if playlist.cover_hash:
             return playlist.cover_hash
-        first = (
+        sources = self.get_cover_sources(playlist.id)
+        return sources[0] if sources else None
+
+    def get_cover_sources(self, playlist_id: int) -> list[str | None]:
+        """Read at most four hashes using the playlist's ordering index.
+
+        Missing artwork is retained: the first four tracks, rather than the first
+        four tracks with artwork, determine the collage and the single-cover rule.
+        """
+        return [row[0] for row in (
             self.session.query(Track.cover_hash)
             .join(PlaylistTrack, PlaylistTrack.track_id == Track.id)
-            .filter(
-                PlaylistTrack.playlist_id == playlist.id,
-                Track.cover_hash.isnot(None),
-            )
-            .order_by(PlaylistTrack.position.asc())
-            .first()
-        )
-        return first[0] if first else None
+            .filter(PlaylistTrack.playlist_id == playlist_id)
+            .order_by(PlaylistTrack.position, PlaylistTrack.id)
+            .limit(4)
+            .all()
+        )]
+
+    def cover_is_referenced(self, cover_hash: str) -> bool:
+        """Check all durable artwork owners before retiring a generated cover."""
+        owners = union_all(
+            select(Track.id).where(Track.cover_hash == cover_hash),
+            select(Album.id).where(Album.cover_hash == cover_hash),
+            select(Artist.id).where(Artist.image_hash == cover_hash),
+            select(Playlist.id).where(Playlist.cover_hash == cover_hash),
+        ).subquery()
+        return self.session.execute(select(owners).limit(1)).first() is not None

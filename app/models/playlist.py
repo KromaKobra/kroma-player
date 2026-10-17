@@ -54,7 +54,9 @@ class Playlist(Base):
         name: User-visible playlist name (required).
         description: Optional freeform notes.
         cover_hash: Optional content address into the cover cache (covers.db). When
-            null, the UI falls back to the first track's artwork.
+            null, the service derives artwork from the first track (under four
+            tracks) or the first four tracks as a grid. Generated references live
+            in covers.db, keeping this field reserved for custom artwork.
         created_at: Creation date as a YYYYMMDD integer.
         updated_at: Last modification as Unix microseconds, used for sorting.
 

@@ -58,6 +58,7 @@ class PlaylistsViewModel(CollectionListModel):
     playlist_created = Signal(int)   # playlist_id
     counts_changed   = Signal()      # any add/remove/create/delete (for empty-state)
     sort_changed = Signal()
+    _reload_requested = Signal()
 
     def __init__(self, playlist_service: PlaylistService, event_bus: EventBus,
                  parent=None) -> None:
@@ -66,18 +67,19 @@ class PlaylistsViewModel(CollectionListModel):
         self._rows: List[dict] = []
         self._sort_field = "recentlyModified"
         self._sort_ascending = False
+        self._reload_requested.connect(self._reload_after_change)
 
         for evt in (
             "playlist.created", "playlist.deleted", "playlist.updated",
             "playlist.track_added", "playlist.track_removed",
-            # A playlist's cover is whatever sits at position 0, so rearranging
-            # one changes how it looks in the grid without its membership moving.
+            # Leading tracks determine the artwork, so rearranging can change it.
             "playlist.reordered",
             # A deleted track cascades out of playlist_tracks at the DB level, so
             # the cached counts/covers must be refreshed too.
             "track.deleted", "track.updated",
         ):
             event_bus.subscribe(evt, self._on_playlists_changed)
+        event_bus.subscribe("playlist.cover_changed", self._on_cover_changed)
 
         self._reload()
 
@@ -152,11 +154,28 @@ class PlaylistsViewModel(CollectionListModel):
         self.sort_changed.emit()
 
     def _on_playlists_changed(self, *_args) -> None:
+        # Track events can originate in an import worker. Repository reads and
+        # artwork scheduling must stay on this model's Qt thread.
+        self._reload_requested.emit()
+
+    @Slot()
+    def _reload_after_change(self) -> None:
         """Refresh the whole model on any playlist mutation (cheap; few playlists)."""
         self.beginResetModel()
         self._reload()
         self.endResetModel()
         self.counts_changed.emit()
+
+    def _on_cover_changed(self, playlist_id: int) -> None:
+        """Artwork finishing must not rebuild delegates or disturb selection."""
+        for index, row in enumerate(self._rows):
+            if row["id"] == playlist_id:
+                cover_hash = self._service.get_cover_hash(playlist_id)
+                if row["cover_hash"] != cover_hash:
+                    row["cover_hash"] = cover_hash
+                    model_index = self.index(index)
+                    self.dataChanged.emit(model_index, model_index, [PlaylistRoles.CoverHash])
+                break
 
     # ------------------------------------------------------------------
     # Slots called from QML

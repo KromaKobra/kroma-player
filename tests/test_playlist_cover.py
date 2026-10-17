@@ -33,15 +33,15 @@ def _summary(service, playlist_id):
     return next(s for s in service.get_summaries() if s["id"] == playlist_id)
 
 
-def test_the_first_track_with_artwork_is_the_cover(playlists):
+def test_the_first_track_determines_the_cover_even_without_artwork(playlists):
     service, repository, track_ids, session = playlists
     playlist_id = service.create_playlist("Covers")
     session.get(Track, track_ids[0]).cover_hash = None
     session.commit()
     service.add_tracks(playlist_id, track_ids)
 
-    assert service.get_cover_hash(playlist_id) == "1" * 32
-    assert _summary(service, playlist_id)["cover_hash"] == "1" * 32, (
+    assert service.get_cover_hash(playlist_id) is None
+    assert _summary(service, playlist_id)["cover_hash"] is None, (
         "the grid and the header disagree about the same playlist's cover"
     )
 

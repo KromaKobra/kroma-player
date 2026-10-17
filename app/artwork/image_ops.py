@@ -118,3 +118,35 @@ def make_thumbnail(source: bytes, size: int) -> bytes:
 
     quality = LARGE_QUALITY if size >= LARGE_SIZE else THUMB_QUALITY
     return to_square_avif(source, size, quality, speed=_THUMB_SPEED)
+
+
+def make_playlist_covers(sources: list[bytes | None], sizes: tuple[int, ...]) -> dict[int, bytes]:
+    """Compose four center-cropped tiles in reading order into AVIF tiers.
+
+    Use the existing in-process encoder instead of starting an ffmpeg process
+    for each cover. Empty tiles retain their position and use a neutral fill.
+    """
+    from app.artwork import LARGE_SIZE
+
+    if len(sources) != 4 or not sizes or any(size <= 0 or size % 2 for size in sizes):
+        raise ValueError("Playlist covers require four sources and an even size")
+    ensure_avif_support()
+    size = max(sizes)
+    canvas = Image.new("RGB", (size, size), (40, 40, 44))
+    half = size // 2
+    for index, source in enumerate(sources):
+        if source is None:
+            continue
+        with Image.open(io.BytesIO(source)) as image:
+            tile = _center_square(image.convert("RGB"))
+            tile = tile.resize((half, half), Image.Resampling.LANCZOS)
+            canvas.paste(tile, ((index % 2) * half, (index // 2) * half))
+    # Decode/crop each source once, then downsample the finished canvas for lists.
+    tiers = {}
+    for tier in sizes:
+        image = canvas if tier == size else canvas.resize((tier, tier), Image.Resampling.LANCZOS)
+        buffer = io.BytesIO()
+        quality = LARGE_QUALITY if tier >= LARGE_SIZE else THUMB_QUALITY
+        image.save(buffer, format="AVIF", quality=quality, speed=_THUMB_SPEED, max_threads=2)
+        tiers[tier] = buffer.getvalue()
+    return tiers

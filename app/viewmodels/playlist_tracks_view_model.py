@@ -32,6 +32,7 @@ class PlaylistTracksViewModel(TrackListModel):
 
     # Notifies the header (name / count) and the play button (enabled state).
     playlist_changed = Signal()
+    _track_artwork_updated = Signal(int)
 
     def __init__(
         self,
@@ -55,13 +56,16 @@ class PlaylistTracksViewModel(TrackListModel):
 
         # True while this model is the one doing the writing. See `_mutating`.
         self._own_write: bool = False
+        self._track_artwork_updated.connect(self._refresh_track_cover)
 
         event_bus.subscribe("track.deleted", self._on_track_deleted)
+        event_bus.subscribe("track.updated", self._on_track_updated)
         event_bus.subscribe("playlist.track_added", self._on_membership_changed)
         event_bus.subscribe("playlist.track_removed", self._on_membership_changed)
         event_bus.subscribe("playlist.reordered", self._on_reordered)
         event_bus.subscribe("playlist.deleted", self._on_playlist_deleted)
         event_bus.subscribe("playlist.updated", self._on_playlist_renamed)
+        event_bus.subscribe("playlist.cover_changed", self._on_cover_changed)
 
     # ------------------------------------------------------------------
     # Writing
@@ -248,7 +252,7 @@ class PlaylistTracksViewModel(TrackListModel):
     def _persist_order(self) -> None:
         with self._mutating():
             self._playlist_service.set_order(self._playlist_id, list(self._ids))
-        # The cover is the first track's, so a new order can mean a new cover.
+        # A new leading order can mean new artwork.
         previous = self._cover_hash
         self._refresh_cover()
         if self._cover_hash != previous:
@@ -324,6 +328,21 @@ class PlaylistTracksViewModel(TrackListModel):
         self._cache.invalidate(track_id)
         if int(track_id) in self._ids:
             self._reload_ids()
+
+    def _on_track_updated(self, track) -> None:
+        self._track_artwork_updated.emit(track.id)
+
+    @Slot(int)
+    def _refresh_track_cover(self, track_id: int) -> None:
+        if track_id in self._ids[:4]:
+            self._on_cover_changed(self._playlist_id)
+
+    def _on_cover_changed(self, playlist_id: int) -> None:
+        if playlist_id == self._playlist_id:
+            previous = self._cover_hash
+            self._refresh_cover()
+            if previous != self._cover_hash:
+                self.playlist_changed.emit()
 
     def _on_membership_changed(self, playlist_id: int, _track_id: int) -> None:
         # `_own_write` is this model's own change coming back around — already

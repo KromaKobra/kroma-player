@@ -179,7 +179,7 @@ def create_service_registry() -> ServiceRegistry:
     )
     registry.register('track_service', track_service)
 
-    playlist_service = PlaylistService(playlist_repo, event_bus)
+    playlist_service = PlaylistService(playlist_repo, event_bus, cover_store)
     registry.register('playlist_service', playlist_service)
 
     # The only writer of the `lyrics` table. Every path that obtains lyrics —
@@ -493,6 +493,10 @@ def persist_app_state(registry: ServiceRegistry) -> None:
     lyrics_vm = registry.get_service('lyrics_view_model')
     if lyrics_vm is not None:
         lyrics_vm.shutdown()
+
+    playlist_service = registry.get_service('playlist_service')
+    if playlist_service is not None:
+        playlist_service.shutdown()
 
     store = registry.get_service('settings_store')
     queue_manager = registry.get_service('queue_manager')
