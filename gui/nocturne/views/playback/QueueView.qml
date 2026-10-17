@@ -13,7 +13,7 @@ Item {
     property bool active: false
     property var columnLayouts: null
 
-    // Forwarded up to the window, which owns navigation to the hidden pages.
+    // Forwarded up to the window, which owns navigation.
     signal generateBackingRequested(var trackIds)
     signal editTrackRequested(int trackId)
 

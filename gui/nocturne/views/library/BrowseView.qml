@@ -74,7 +74,7 @@ Item {
     // re-evaluate on its own.
     property int playableCount: 0
 
-    // Forwarded up to the window, which owns navigation to the hidden pages.
+    // Forwarded up to the window, which owns navigation.
     // Only database results can raise it — a web result has no library row yet,
     // and the menu entry checks for one.
     signal editTrackRequested(int trackId)

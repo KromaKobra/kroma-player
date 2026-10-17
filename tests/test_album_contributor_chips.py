@@ -438,7 +438,6 @@ def test_the_other_pages_are_untouched(qt_app, backend):
     engine, root, _ = _load(qt_app, backend, backend.compilation_id)
 
     backend.get_service("artist_edit_view_model").load(backend.lead_artist_id)
-    root.setProperty("artistOpen", True)
     root.setProperty("viewIndex", ARTIST_VIEW)
     for _ in range(8):
         qt_app.processEvents()

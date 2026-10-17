@@ -7,7 +7,7 @@ from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickItem
 from PySide6.QtTest import QTest
 from test_album_search_rows import backend, _load
-from test_hidden_tabs import _call
+from test_tab_navigation import _call
 
 GUI = Path(__file__).resolve().parents[1] / "gui" / "nocturne"
 

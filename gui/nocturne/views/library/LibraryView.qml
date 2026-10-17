@@ -14,17 +14,17 @@ Item {
     property bool active: false
     property var columnLayouts: null
 
-    // Forwarded up to the window, which owns navigation to the hidden pages.
+    // Forwarded up to the window, which owns navigation.
     signal generateBackingRequested(var trackIds)
     signal editTrackRequested(int trackId)
-    // An artist tile was pressed. The window owns navigation to the hidden
-    // artist page, exactly as it does for BrowseView's artist rows.
+    // An artist tile was pressed. The window opens the artist inside the
+    // Artists tab, exactly as it does for BrowseView's artist rows.
     signal openArtistRequested(int artistId)
     signal editArtistRequested(int artistId)
     signal editAlbumRequested(int albumId)
 
-    // An album tile was pressed. The window owns navigation to the hidden album
-    // page, exactly as it does for the artist one.
+    // An album tile was pressed. The window opens the album inside the Albums
+    // tab, exactly as it does for the artist one.
     signal openAlbumRequested(int albumId)
 
     // Sidebar collection identity is independent of each display preference.

@@ -15,9 +15,9 @@ So the tests here post real ``QWheelEvent``s at the bar's actual window
 coordinates rather than calling into the handler.
 
 **The rail steps by slot, not by view index.** Concept destinations are grouped,
-three entries select different faces of Library, and open pages come and go.
-``+1`` on the view index would skip visible destinations; stepping the slot
-lands on the next entry. The isolated fixture exercises an open editor.
+three entries select different faces of Library, and the order on screen is not
+the order of the view indices. ``+1`` on the view index would skip visible
+destinations; stepping the slot lands on the next entry.
 
 **A flick must not empty the rail.** One two-finger swipe delivers hundreds of
 pixels across dozens of events. Handed straight to a six-entry rail, every one
@@ -82,10 +82,10 @@ def gui(qt_app, tmp_path_factory):
 
 
 @pytest.fixture(scope="module")
-def transient_rail(qt_app):
-    """A rail of its own with an open editor after the permanent Import entry.
+def isolated_rail(qt_app):
+    """A rail of its own, driven by a stand-in for main.qml.
 
-    No dirty editor is needed to ask a question about slot arithmetic.
+    No backend is needed to ask a question about slot arithmetic.
     """
     from PySide6.QtCore import QUrl
     from PySide6.QtQml import QQmlApplicationEngine
@@ -115,7 +115,6 @@ Window {
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         currentIndex: probe.index
-        showEdit: true
         onNavigated: function (i) {
             probe.index = i
             probe.navigations += 1
@@ -276,13 +275,13 @@ def test_a_trackpad_flick_does_not_tear_through_the_rail(gui):
     )
 
 
-def test_the_rail_steps_by_slot_not_by_view_index(transient_rail):
-    """With a transient tab up, the next slot down is not the next view index.
+def test_the_rail_steps_by_slot_not_by_view_index(isolated_rail):
+    """The next slot down is not the next view index.
 
-    From Playlists (view 3), the next entries are Import (8), an open editor
-    (7), then Settings (5). Incrementing view indices cannot produce that path.
+    From Playlists (view 3), the next entries are Import (8) and then Settings
+    (5). Incrementing view indices cannot produce that path.
     """
-    window, qt_app = transient_rail
+    window, qt_app = isolated_rail
     rail = _item(window, "rail")
     point = _centre(rail, y=100)
 
@@ -290,12 +289,8 @@ def test_the_rail_steps_by_slot_not_by_view_index(transient_rail):
 
     _notch(window, qt_app, point, -1)
     assert window.property("index") == 8, (
-        "the step walked the view index rather than the rail — with a "
-        "transient slot up those are different numbers"
+        "the step walked the view index rather than the rail"
     )
-
-    _notch(window, qt_app, point, -1)
-    assert window.property("index") == 7, "and on to the open editor"
 
     _notch(window, qt_app, point, -1)
     assert window.property("index") == 5, "Settings is the footer destination"
@@ -304,7 +299,7 @@ def test_the_rail_steps_by_slot_not_by_view_index(transient_rail):
     assert window.property("index") == 5, "which is the last slot; no wrap"
 
     _notch(window, qt_app, point, +1)
-    assert window.property("index") == 7, "back up the way it came"
+    assert window.property("index") == 8, "back up the way it came"
 
 
 def test_a_notch_over_the_settings_tabs_moves_one_tab(gui):

@@ -47,6 +47,9 @@ Requires GUI API version 13 (Kroma Player with `docs/GUI_API.md`).
   source picker at all. An empty box in library mode shows everything, so this doubles as the
   browse-all view.
 - **Playlists** — a cover grid that opens into a detail page with its own hero.
+- **Songs, Albums, Artists** — the library's three faces. An album or artist
+  opens inside its own tab, as does a track's editor inside Songs — see
+  *Tabs and the pages inside them* below.
 - **Library** — what is stored and how much space it takes. The import buttons
   live in its header, but the run itself happens on a page of its own.
 - **Settings** — searchable categories for Appearance, Playback, Backing,
@@ -81,7 +84,8 @@ icon column's center as the wordmark fades out. Its texture stays at a fixed
 resolution while the scene graph scales it.
 
 Navigation history remembers up to 60 destinations for the current session,
-including artist/album IDs, track editors, library sections, and search context.
+including artist, album and playlist IDs, track editors, library sections, and
+search context.
 Back and Forward move through that stack; choosing a new destination after
 going back replaces the forward branch. The history button opens a keyboard
 accessible list anchored to its control. Revisiting an already loaded editor
@@ -103,7 +107,7 @@ including tiling window managers; no manual window geometry is used.
 | `↑` / `↓` | Volume |
 | `Ctrl + F` | Focus and select the global search text |
 | `Alt + ←` / `Alt + →` | Previous / next view |
-| `Ctrl + 1`…`6` | Jump to a section |
+| `Ctrl + 1`…`6` | Jump to a section; again to go to its root |
 | `Ctrl + I` | Toggle the details panel |
 | `Esc` | Close a dialog, clear the search box |
 
@@ -318,6 +322,31 @@ Rows arriving at the end of the import list get one thing further, since an
 append lands below the fold where a fade cannot be seen at all: `revealAdded`
 scrolls them into view wearing an accent wash that fades.
 
+**Tabs and the pages inside them.** Every rail entry is a tab, and a tab can
+open pages inside itself: Songs opens a track's editor, Artists an artist and
+then its editor, Albums an album and then its editor, Playlists a playlist.
+Whatever you open lands in the tab it belongs to, wherever you asked for it
+from — an artist named in a Queue row opens in Artists — and the rail lights
+that tab rather than growing an entry of its own. `tabPages` in `main.qml` is
+the whole map.
+
+The arrow at the top-left of such a page goes up one level inside the tab: an
+editor to its artist or album, the artist or album to its wall, a playlist to
+its grid. It never goes back to wherever you came from — that is what the title
+bar's history is for, and a playlist is a history entry like any other page.
+Leaving a tab and coming back finds it on the page you left it on; choosing the
+tab you are already on takes you to its root, the way a tab bar does. Leaving
+an editor by its arrow asks before throwing staged edits away, because there is
+then nothing in the tab to come back to; stepping to another tab keeps them.
+
+Going in and coming out take the same path. A page opened inside the current
+tab comes in from the right while the one beneath it steps left, and Back
+reverses both — `StackSlide`, on the same terms and the same twelve pixels as
+the Settings glide below. Switching tabs has no "deeper" to show, so it stays
+the plain cross-fade. The window says which way a navigation goes before it
+changes the page, so the direction is right on the frame the move starts, and
+a page caught mid-glide retargets from where it is on screen.
+
 **Settings glides sideways, but not far.** Its six tabs are laid out left to
 right and the pages move as if they were: the one you are leaving slides off
 toward its own side while the one you picked comes in from its own, under a
@@ -391,9 +420,8 @@ before a vault or GUI package is available.
 destinations, a Library group with Songs, Albums, Artists and Playlists, Tools
 with Import, an empty Pinned heading, and Settings in the footer. Songs, Albums
 and Artists select the existing Library page's corresponding face. Home is a
-blank page. Open artist, album and track edit pages appear in an Open pages
-group while relevant. The backing workbench remains reachable through track
-actions; it has no sidebar button.
+blank page. The rail lists tabs and nothing else; the backing workbench remains
+reachable through track actions and has no sidebar button.
 
 The sidebar toggle and **Ctrl+B** switch between a 64px icon rail and the user's
 expanded width (200–360px, constrained by available content space). Drag the

@@ -54,6 +54,10 @@ class PlaylistService:
         """Fetch a single playlist by id (for header metadata)."""
         return self.playlist_repo.get_by_id(playlist_id)
 
+    def get_cover_hash(self, playlist_id: int) -> Optional[str]:
+        """Return one playlist's resolved cover hash (own cover, else first track's)."""
+        return self.playlist_repo.get_cover_hash(playlist_id)
+
     # ------------------------------------------------------------------
     # Mutations
     # ------------------------------------------------------------------

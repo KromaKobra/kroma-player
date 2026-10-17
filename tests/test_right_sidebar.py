@@ -6,7 +6,7 @@ from PySide6.QtCore import QPoint, QPointF, QUrl, Qt
 from PySide6.QtQml import QQmlApplicationEngine, QQmlEngine
 from PySide6.QtQuick import QQuickItem
 from PySide6.QtTest import QTest
-from test_hidden_tabs import gui as application_gui
+from test_tab_navigation import gui as application_gui
 
 GUI = Path(__file__).resolve().parents[1] / "gui" / "nocturne"
 

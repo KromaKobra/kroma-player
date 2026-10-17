@@ -6,7 +6,8 @@ painted. Opening a 5,000-track playlist costs the same as opening an empty one.
 
 Lifecycle:
 - QML calls ``load(playlist_id)`` when the user opens a playlist.
-- The header binds ``playlistName`` / ``trackCount``.
+- The header binds ``playlistName`` / ``trackCount`` / ``coverHash``; the
+  window reads ``hasPlaylist`` to refuse a history entry whose playlist is gone.
 - The context menu calls ``removeSelectedFromPlaylist()``; the play button reads
   ``trackIds()`` and hands them to ``playerVM.replace_queue_and_play()``.
 - It listens on the EventBus so the open playlist stays current when tracks are
@@ -44,6 +45,11 @@ class PlaylistTracksViewModel(TrackListModel):
 
         self._playlist_id: int = -1
         self._playlist_name: str = ""
+        self._has_playlist: bool = False
+        # Resolved here rather than handed in by whoever opened the playlist, so
+        # a playlist reopened from history has its cover, and a reorder that
+        # changes the first track changes it.
+        self._cover_hash: str = ""
         # Rows in a playlist are unique, so a row's uid can simply be its track
         # id — there is no second copy for it to be confused with.
 
@@ -99,6 +105,14 @@ class PlaylistTracksViewModel(TrackListModel):
     def trackCount(self) -> int:  # noqa: N802
         return len(self._ids)
 
+    @Property(bool, notify=playlist_changed)
+    def hasPlaylist(self) -> bool:  # noqa: N802
+        return self._has_playlist
+
+    @Property(str, notify=playlist_changed)
+    def coverHash(self) -> str:  # noqa: N802
+        return self._cover_hash
+
     # ------------------------------------------------------------------
     # Loading
     # ------------------------------------------------------------------
@@ -109,6 +123,7 @@ class PlaylistTracksViewModel(TrackListModel):
         self._playlist_id = int(playlist_id)
         playlist = self._playlist_service.get_playlist(self._playlist_id)
         self._playlist_name = playlist.name if playlist else ""
+        self._has_playlist = playlist is not None
         self._reload_ids()
 
     @Slot()
@@ -125,7 +140,15 @@ class PlaylistTracksViewModel(TrackListModel):
             else []
         )
         self.set_ids(ids)
+        self._refresh_cover()
         self.playlist_changed.emit()
+
+    def _refresh_cover(self) -> None:
+        self._cover_hash = (
+            self._playlist_service.get_cover_hash(self._playlist_id) or ""
+            if self._has_playlist
+            else ""
+        )
 
     # ------------------------------------------------------------------
     # Removal from playlist
@@ -185,6 +208,7 @@ class PlaylistTracksViewModel(TrackListModel):
 
         # Once, not per run, and outside the brackets — see `_set_vectors`.
         self.refresh_selection()
+        self._refresh_cover()
         self.playlist_changed.emit()
 
     # ------------------------------------------------------------------
@@ -224,6 +248,11 @@ class PlaylistTracksViewModel(TrackListModel):
     def _persist_order(self) -> None:
         with self._mutating():
             self._playlist_service.set_order(self._playlist_id, list(self._ids))
+        # The cover is the first track's, so a new order can mean a new cover.
+        previous = self._cover_hash
+        self._refresh_cover()
+        if self._cover_hash != previous:
+            self.playlist_changed.emit()
 
     @Slot(int, int)
     def moveTrack(self, from_index: int, to_index: int) -> None:  # noqa: N802
@@ -329,4 +358,5 @@ class PlaylistTracksViewModel(TrackListModel):
         if playlist_id == self._playlist_id:
             self._playlist_id = -1
             self._playlist_name = ""
+            self._has_playlist = False
             self._reload_ids()

@@ -49,9 +49,10 @@ Window {
 
     // ------------------------------------------------------------------ state
 
-    // Restore the main collection destinations or Home (13). Editors and
-    // work pages need loaded entities or an import session, so do not reopen
-    // them from only a saved index.
+    // Restore the main collection destinations or Home (13). Pages opened
+    // inside a tab need a loaded entity, so what is saved is the tab's root —
+    // see navigate() — and the work pages need an import session, so they are
+    // not reopened from only a saved index.
     property int viewIndex: Theme.prefs.navIndex === 13 ? 13
         : Math.max(0, Math.min(Theme.prefs.navIndex, 5))
     // Restored from session.json alongside the geometry it belongs with. It
@@ -64,19 +65,111 @@ Window {
     readonly property real infoEffectiveWidth:
         infoResize.targetWidth
 
-    // Where Back on a hidden page returns to. Never one of those pages itself.
+    // Where finishing on a workbench returns to. Never a workbench itself.
     property int previousViewIndex: 0
+    readonly property var workbenchViews: [6, 8]
 
-    readonly property var hiddenViews: [6, 7, 8, 9, 10, 11, 12]
+    // ---------------------------------------------------------------- tabs
+    //
+    // Every rail entry is a tab, and a tab can open pages inside itself: Songs
+    // the track editor, Artists an artist and then its editor, Albums an album
+    // and then its editor, Playlists a playlist. Whatever you open lands in the
+    // tab it belongs to, wherever you asked for it from, and the rail lights
+    // that tab. The back arrow on such a page goes up one level inside the
+    // tab; the title bar's history is how you get back to anything else.
+    //
+    // The pages keep their own view indices, so each stays alive behind the
+    // others with its state and scroll position. This says which tab each one
+    // belongs to — a root view, the Library face, and how deep it sits. The
+    // playlist sits inside PlaylistsView rather than in the stack, one level
+    // into view 3.
+    readonly property var tabPages: ({
+        7:  { root: 4, mode: 0, depth: 1 },
+        9:  { root: 4, mode: 1, depth: 1 },
+        10: { root: 4, mode: 1, depth: 2 },
+        11: { root: 4, mode: 2, depth: 1 },
+        12: { root: 4, mode: 2, depth: 2 }
+    })
 
-    // Whether the artist and album slots are up. Set by opening one and cleared
-    // only by Back on its page: an artist you went to look at stays in the rail
-    // while you step over to the Library and back, the way the page you were
-    // just on ought to. Tying the slot to "you are standing on the page" instead
-    // would take it away the moment you looked at anything else, which leaves no
-    // way back short of finding the artist again.
-    property bool artistOpen: false
-    property bool albumOpen: false
+    function tabRootOf(view) {
+        var page = tabPages[view]
+        return page ? page.root : view
+    }
+    // A route's tab. View 4 is three tabs, told apart by the Library face.
+    function tabKeyOf(route) {
+        var page = tabPages[route.view]
+        if (page) return page.root + ":" + page.mode
+        if (route.view !== 4) return String(route.view)
+        return "4:" + (route.libraryMode !== undefined ? route.libraryMode
+                                                        : Theme.prefs.libraryMode)
+    }
+    function depthOf(route) {
+        var page = tabPages[route.view]
+        if (page) return page.depth
+        if (route.view !== 3) return 0
+        var playlist = route.entityId !== undefined ? route.entityId : playlistsPage.openId
+        return playlist > 0 ? 1 : 0
+    }
+
+    // The page each Library tab was last left on, so going back to the tab
+    // finds it as you left it — as the Playlists tab always has, by keeping
+    // its open playlist. A view index only: the entity is whichever one the
+    // tab's shared view model has loaded. Session-only.
+    property var tabTops: ({})
+
+    // Which way the navigation in progress goes: +1 deeper into a tab, -1 back
+    // up it, 0 to another tab. Set before the page changes — see StackSlide.
+    property int navDirection: 0
+
+    function pageLoaded(view) {
+        if (view === 7) return editVM.hasTrack
+        if (view === 9 || view === 10) return artistVM.hasArtist
+        if (view === 11 || view === 12) return albumVM.hasAlbum
+        return true
+    }
+
+    // What the rail and the tab shortcuts call. Choosing the tab you are on
+    // takes you to its root, the way a tab bar does; choosing another returns
+    // to the page you left it on, if that page still has something to show.
+    function selectTab(view, mode) {
+        if (view === 4 && mode === undefined) mode = Theme.prefs.libraryMode
+        var root = { view: view, entityId: 0 }
+        if (view === 4) root.libraryMode = mode
+        var key = tabKeyOf(root)
+        if (key === tabKeyOf({ view: viewIndex })) {
+            navigate(root)
+        } else if (view === 3) {
+            go(3)
+        } else {
+            var top = tabTops[key]
+            if (top !== undefined && top !== view && pageLoaded(top)) go(top)
+            else navigate(root)
+        }
+    }
+
+    // The back arrow on a page inside a tab: one level up, in the same tab.
+    function goUp(view) {
+        if (view === 3) navigate({ view: 3, entityId: 0 })
+        else if (view === 10 && artistVM.hasArtist) go(9)
+        else if (view === 12 && albumVM.hasAlbum) go(11)
+        else if (tabPages[view]) goLibrary(tabPages[view].mode)
+    }
+
+    // An editor's back arrow, which is leaving its edits behind: with nothing
+    // in the tab to come back to, staged changes would be stranded in the
+    // view model. Ask first. Moving to another tab, or anywhere through
+    // history, keeps them — the tab keeps its editor until you come back.
+    function leaveEditor(view) {
+        var dirty = view === 7 ? editVM.isDirty
+                  : view === 10 ? artistVM.isDirty
+                  : view === 12 ? albumVM.isDirty : false
+        if (!dirty) {
+            goUp(view)
+            return
+        }
+        discardEdits.pendingView = view
+        discardEdits.open()
+    }
 
     // The track lists' column layouts, instantiated once and handed down, so a
     // layout survives switching tabs and the queue and history keep sharing
@@ -102,6 +195,7 @@ Window {
     function editArtist(id) { if (id > 0) navigate({view: 10, entityId: id}) }
     function openAlbum(id) { if (id > 0) navigate({view: 11, entityId: id}) }
     function editAlbum(id) { if (id > 0) navigate({view: 12, entityId: id}) }
+    function openPlaylist(id) { if (id > 0) navigate({view: 3, entityId: id}) }
 
     // Start an import from a source chosen somewhere else — the Library header
     // is the only such place today. The page is put up first and raises its own
@@ -133,6 +227,9 @@ Window {
         } else if (viewIndex === 11 || viewIndex === 12) {
             route.entityId = albumVM.albumId
             route.label += " · " + albumVM.name
+        } else if (viewIndex === 3 && playlistsPage.openId > 0) {
+            route.entityId = playlistsPage.openId
+            route.label = "Playlist · " + playlistTracksVM.playlistName
         } else if (viewIndex === 2) {
             route.query = browsePage.query
             route.source = searchVM.currentSource
@@ -149,6 +246,7 @@ Window {
         if (index === 7) route.entityId = editVM.trackId
         if (index === 9 || index === 10) route.entityId = artistVM.artistId
         if (index === 11 || index === 12) route.entityId = albumVM.albumId
+        if (index === 3) route.entityId = Math.max(0, playlistsPage.openId)
         navigate(route)
     }
     function goLibrary(mode) { navigate({view: 4, libraryMode: mode}) }
@@ -165,8 +263,11 @@ Window {
             && artistVM.artistId !== entityId
         var albumChange = (route.view === 11 || route.view === 12)
             && albumVM.albumId !== entityId
+        var oldPlaylistId = Math.max(0, playlistsPage.openId)
+        var playlistChange = route.view === 3 && route.entityId !== undefined
+            && oldPlaylistId !== entityId
         if (historyIndex === undefined && route.view === viewIndex
-            && !trackChange && !artistChange && !albumChange
+            && !trackChange && !artistChange && !albumChange && !playlistChange
             && (route.libraryMode === undefined || route.libraryMode === Theme.prefs.libraryMode)
             && route.query === undefined) return
         if (!discardApproved && ((trackChange && editVM.isDirty)
@@ -177,38 +278,57 @@ Window {
             return
         }
         var oldRoute = currentRoute()
+        var oldTab = tabKeyOf(oldRoute)
+        var oldDepth = depthOf(oldRoute)
         var oldTrackId = editVM.trackId
         var oldArtistId = artistVM.artistId
         var oldAlbumId = albumVM.albumId
         if (trackChange) editVM.load(entityId)
         if (artistChange) artistVM.load(entityId)
         if (albumChange) albumVM.load(entityId)
+        if (playlistChange && entityId > 0) playlistTracksVM.load(entityId)
         if ((route.view === 7 && !editVM.hasTrack)
             || ((route.view === 9 || route.view === 10) && !artistVM.hasArtist)
-            || ((route.view === 11 || route.view === 12) && !albumVM.hasAlbum)) {
+            || ((route.view === 11 || route.view === 12) && !albumVM.hasAlbum)
+            || (playlistChange && entityId > 0 && !playlistTracksVM.hasPlaylist)) {
             // A removed history item must not empty the profile we were on.
             if (trackChange && oldTrackId > 0) editVM.load(oldTrackId)
             if (artistChange && oldArtistId > 0) artistVM.load(oldArtistId)
             if (albumChange && oldAlbumId > 0) albumVM.load(oldAlbumId)
+            if (playlistChange && entityId > 0 && oldPlaylistId > 0)
+                playlistTracksVM.load(oldPlaylistId)
             navigationToast.show("This item is no longer in your library", true)
             return
         }
-        if (route.view === 9 || route.view === 10) artistOpen = true
-        if (route.view === 11 || route.view === 12) {
-            albumOpen = true
-            if (albumTracksVM.albumId !== entityId) albumTracksVM.load(entityId)
-        }
+        if ((route.view === 11 || route.view === 12) && albumTracksVM.albumId !== entityId)
+            albumTracksVM.load(entityId)
         if (route.view === 4 && route.libraryMode !== undefined)
             Theme.prefs.libraryMode = route.libraryMode
         if (route.view === 2 && route.query !== undefined)
             browsePage.restoreQuery(route.query, route.source, route.mode)
 
+        var newTab = tabKeyOf(route)
+        var newDepth = depthOf(route)
+        navDirection = newTab !== oldTab ? 0
+                     : newDepth > oldDepth ? 1 : newDepth < oldDepth ? -1 : 0
+        playlistsPage.stackDirection = navDirection
+        if (playlistChange) {
+            if (entityId > 0) playlistsPage.open(entityId)
+            else playlistsPage.back()
+        }
         if (route.view !== viewIndex) {
-            if (hiddenViews.indexOf(viewIndex) < 0) previousViewIndex = viewIndex
+            if (workbenchViews.indexOf(viewIndex) < 0) previousViewIndex = viewIndex
             sidebarVM.setSelection([])
             viewIndex = route.view
-            Theme.prefs.navIndex = viewIndex
+            // A page inside a tab is saved as the tab: it needs an entity to
+            // show, and only the root can be restored from a number.
+            Theme.prefs.navIndex = tabRootOf(viewIndex)
         }
+        // After the switch, so the Library behind the page — no longer the
+        // one on screen — changes face without refreshing a wall nobody sees.
+        var page = tabPages[route.view]
+        if (page) Theme.prefs.libraryMode = page.mode
+        if (route.view === 4 || page) tabTops[newTab] = route.view
         navigationHistory.update(oldRoute)
         if (historyIndex !== undefined && historyIndex >= 0) {
             navigationHistory.cursor = historyIndex
@@ -226,6 +346,22 @@ Window {
         confirmText: "Discard edits"
         danger: true
         onConfirmed: mainWindow.navigate(pendingRoute, pendingIndex, true)
+    }
+    ConfirmDialog {
+        id: discardEdits
+        objectName: "discardEditsDialog"
+        property int pendingView: -1
+        title: "Discard unsaved edits?"
+        body: "Your changes haven't been saved. Going back throws them away."
+        confirmText: "Discard"
+        cancelText: "Keep editing"
+        danger: true
+        onConfirmed: {
+            if (pendingView === 7) editVM.revert()
+            else if (pendingView === 10) artistVM.revert()
+            else if (pendingView === 12) albumVM.revert()
+            mainWindow.goUp(pendingView)
+        }
     }
     Toast { id: navigationToast }
 
@@ -329,47 +465,16 @@ Window {
         anchors.left: parent.left
         anchors.top: titleBar.bottom
         anchors.bottom: player.top
-        currentIndex: mainWindow.viewIndex
+        // The tab, not the page: an artist lights Artists, an editor its tab.
+        currentIndex: mainWindow.tabRootOf(mainWindow.viewIndex)
         libraryMode: Theme.prefs.libraryMode
         reducedMotion: Theme.prefs.reducedMotion
         expandedWidth: settingsVM.sessionValue("window.sidebarWidth", 240)
         collapsed: settingsVM.sessionValue("window.sidebarCollapsed", false)
         maximumWidth: Math.min(360, mainWindow.width - 380
             - (mainWindow.infoOpen ? 240 : 0))
-        // The editor keeps its slot only while there is something to lose, so
-        // you can go look at the track list mid-edit and find your way back.
-        // A saved track is no longer being edited, and the slot goes with it.
-        showEdit: mainWindow.viewIndex === 7 || editVM.isDirty
-        // Import is now a permanent destination in the Tools group.
-        // A slot from the moment you open an artist until Back on that page
-        // closes it, plus the usual unsaved-work reprieve. Not "while you are
-        // on one of the artist pages": stepping over to the Library is not
-        // done with the artist, and taking the slot away there would strand
-        // the page you were just on. Back is the one thing that means finished
-        // — see `artistOpen`.
-        //
-        // Two views, one slot: the editor is a mode of the artist page rather
-        // than a separate destination, so it lights the same slot.
-        showArtist: mainWindow.artistOpen || mainWindow.viewIndex === 9
-                    || mainWindow.viewIndex === 10 || artistVM.isDirty
-        artistLabel: artistVM.hasArtist ? artistVM.name : "Artist"
-        // Where the slot goes. The editor while you are standing in it, or when
-        // an unsaved edit is the only reason the slot is still up — that is
-        // where the edit is. Otherwise the artist's page, including from
-        // elsewhere in the app: the slot is how you get back to what you were
-        // looking at, which is the page and not the form.
-        artistView: mainWindow.viewIndex === 10 ? 10
-                    : (mainWindow.artistOpen || mainWindow.viewIndex === 9
-                       ? 9 : 10)
-        // The album slot, on the same terms as the artist one above.
-        showAlbum: mainWindow.albumOpen || mainWindow.viewIndex === 11
-                   || mainWindow.viewIndex === 12 || albumVM.isDirty
-        albumLabel: albumVM.hasAlbum ? albumVM.name : "Album"
-        albumView: mainWindow.viewIndex === 12 ? 12
-                   : (mainWindow.albumOpen || mainWindow.viewIndex === 11
-                      ? 11 : 12)
-        onNavigated: function (index) { mainWindow.go(index) }
-        onLibraryNavigated: function (mode) { mainWindow.goLibrary(mode) }
+        onNavigated: function (index) { mainWindow.selectTab(index) }
+        onLibraryNavigated: function (mode) { mainWindow.selectTab(4, mode) }
         drawSurface: false
         headerHost: titleBar
         headerHovered: titleBar.sidebarHovered
@@ -451,6 +556,8 @@ Window {
                     mainWindow.generateBackingFor(ids)
                 }
                 onEditTrackRequested: function (id) { mainWindow.editTrack(id) }
+                onOpenPlaylistRequested: function (id) { mainWindow.openPlaylist(id) }
+                onDone: mainWindow.goUp(3)
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
             }
             SizeWhileVisible { target: playlistsPage; width: stack.width; height: stack.height }
@@ -469,6 +576,7 @@ Window {
                 onOpenArtistRequested: function (id) { mainWindow.openArtist(id) }
                 onOpenAlbumRequested: function (id) { mainWindow.openAlbum(id) }
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
+                transform: StackSlide { current: libraryPage.active; direction: mainWindow.navDirection }
             }
             SizeWhileVisible { target: libraryPage; width: stack.width; height: stack.height }
             SettingsView {
@@ -505,24 +613,28 @@ Window {
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
             }
             SizeWhileVisible { target: importPage; width: stack.width; height: stack.height }
-            // Also not in the rail. You get here by choosing Edit on a single
-            // track. Declared last so that when several hidden pages are up it
-            // is the editor that paints over the others during the crossfade,
-            // matching the order they sit in on the rail.
+            // Pages opened inside a tab, from here down. Each is declared after
+            // the page it opens from, so the deeper page is the one painted on
+            // top while the two cross over.
+            //
+            // The Songs tab's editor. You get here by choosing Edit on a single
+            // track, from any list that shows one.
             TrackEditView {
                 id: trackEditPage
+                objectName: "trackEditView"
                 active: mainWindow.viewIndex === 7
                 opacity: active ? 1 : 0
                 visible: opacity > 0
-                onDone: mainWindow.go(mainWindow.previousViewIndex)
+                onDone: mainWindow.leaveEditor(7)
                 onOpenArtistRequested: function (id) { mainWindow.openArtist(id) }
                 onOpenAlbumRequested: function (id) { mainWindow.openAlbum(id) }
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
+                transform: StackSlide { current: trackEditPage.active; direction: mainWindow.navDirection }
             }
             SizeWhileVisible { target: trackEditPage; width: stack.width; height: stack.height }
-            // One artist's catalogue. Not in the rail: you arrive from a search
-            // result, a track's artist name, or the details panel — always from
-            // something that mentioned the artist.
+            // One artist's catalogue, inside the Artists tab. You arrive from the
+            // wall, a search result, a track's artist name, or the details panel
+            // — always from something that mentioned the artist.
             ArtistView {
                 id: artistPage
                 objectName: "artistView"
@@ -530,26 +642,18 @@ Window {
                 active: mainWindow.viewIndex === 9
                 opacity: active ? 1 : 0
                 visible: opacity > 0
-                // Back is what closes the artist: it puts the page away and
-                // takes its rail slot with it. Anything else you do only moves
-                // off the page and leaves it there to come back to.
-                onDone: {
-                    mainWindow.artistOpen = false
-                    mainWindow.go(mainWindow.previousViewIndex)
-                }
+                onDone: mainWindow.goUp(9)
                 onEditArtistRequested: function (id) { mainWindow.editArtist(id) }
                 onEditTrackRequested: function (id) { mainWindow.editTrack(id) }
                 onGenerateBackingRequested: function (ids) {
                     mainWindow.generateBackingFor(ids)
                 }
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
+                transform: StackSlide { current: artistPage.active; direction: mainWindow.navDirection }
             }
             SizeWhileVisible { target: artistPage; width: stack.width; height: stack.height }
-            // Declared last, so that with several hidden pages up it is the
-            // editor that paints over the others during the crossfade — the same
-            // reason TrackEditView sits at the end of the track side.
-            // One album's running order. Reached from the albums face of the
-            // Library, or from anything that named the album.
+            // One album's running order, inside the Albums tab. Reached from the
+            // albums wall, or from anything that named the album.
             AlbumView {
                 id: albumPage
                 objectName: "albumView"
@@ -557,11 +661,7 @@ Window {
                 active: mainWindow.viewIndex === 11
                 opacity: active ? 1 : 0
                 visible: opacity > 0
-                // Back closes the album, slot and all — see ArtistView above.
-                onDone: {
-                    mainWindow.albumOpen = false
-                    mainWindow.go(mainWindow.previousViewIndex)
-                }
+                onDone: mainWindow.goUp(11)
                 onOpenArtistRequested: function (id) { mainWindow.openArtist(id) }
                 onEditAlbumRequested: function (id) { mainWindow.editAlbum(id) }
                 onEditTrackRequested: function (id) { mainWindow.editTrack(id) }
@@ -570,51 +670,32 @@ Window {
                 }
                 onImportPageRequested: mainWindow.go(8)
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
+                transform: StackSlide { current: albumPage.active; direction: mainWindow.navDirection }
             }
             SizeWhileVisible { target: albumPage; width: stack.width; height: stack.height }
             ArtistEditView {
                 id: artistEditPage
+                objectName: "artistEditView"
                 active: mainWindow.viewIndex === 10
                 opacity: active ? 1 : 0
                 visible: opacity > 0
-                // Back lands on the artist's page, not on wherever the artist
-                // was reached from. You got here from there, and both are hidden
-                // pages, so `previousViewIndex` still names the last *permanent*
-                // view and would skip the page you were just looking at.
-                // A split leaves no artist to go back to, hence the fallback —
-                // and no artist to keep a slot for either, so that closes it.
-                onDone: {
-                    if (artistVM.hasArtist) {
-                        mainWindow.go(9)
-                    } else {
-                        mainWindow.artistOpen = false
-                        mainWindow.go(mainWindow.previousViewIndex)
-                    }
-                }
+                // Up to the artist's page. A split leaves no artist to go back
+                // to, so that lands on the Artists wall instead — see goUp().
+                onDone: mainWindow.leaveEditor(10)
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
+                transform: StackSlide { current: artistEditPage.active; direction: mainWindow.navDirection }
             }
             SizeWhileVisible { target: artistEditPage; width: stack.width; height: stack.height }
-            // Last of all, for the reason ArtistEditView is second-to-last: with
-            // several hidden pages up it should be the editor that paints over
-            // the others during the crossfade.
             AlbumEditView {
                 id: albumEditPage
+                objectName: "albumEditView"
                 active: mainWindow.viewIndex === 12
                 opacity: active ? 1 : 0
                 visible: opacity > 0
-                // Back lands on the album's page, not on wherever the album was
-                // reached from — both are hidden pages, so `previousViewIndex`
-                // names the last *permanent* view and would skip the page you
-                // were just looking at.
-                onDone: {
-                    if (albumVM.hasAlbum) {
-                        mainWindow.go(11)
-                    } else {
-                        mainWindow.albumOpen = false
-                        mainWindow.go(mainWindow.previousViewIndex)
-                    }
-                }
+                // Up to the album's page, or the Albums wall if it is gone.
+                onDone: mainWindow.leaveEditor(12)
                 Behavior on opacity { NumberAnimation { duration: Theme.normal } }
+                transform: StackSlide { current: albumEditPage.active; direction: mainWindow.navDirection }
             }
             SizeWhileVisible { target: albumEditPage; width: stack.width; height: stack.height }
         }
@@ -753,12 +834,12 @@ Window {
     }
     Shortcut { sequence: "Alt+Left"; onActivated: mainWindow.visitHistory(navigationHistory.cursor - 1) }
     Shortcut { sequence: "Alt+Right"; onActivated: mainWindow.visitHistory(navigationHistory.cursor + 1) }
-    Shortcut { sequence: "Ctrl+1"; onActivated: mainWindow.go(0) }
-    Shortcut { sequence: "Ctrl+2"; onActivated: mainWindow.go(1) }
-    Shortcut { sequence: "Ctrl+3"; onActivated: mainWindow.go(2) }
-    Shortcut { sequence: "Ctrl+4"; onActivated: mainWindow.go(3) }
-    Shortcut { sequence: "Ctrl+5"; onActivated: mainWindow.go(4) }
-    Shortcut { sequence: "Ctrl+6"; onActivated: mainWindow.go(5) }
+    Shortcut { sequence: "Ctrl+1"; onActivated: mainWindow.selectTab(0) }
+    Shortcut { sequence: "Ctrl+2"; onActivated: mainWindow.selectTab(1) }
+    Shortcut { sequence: "Ctrl+3"; onActivated: mainWindow.selectTab(2) }
+    Shortcut { sequence: "Ctrl+4"; onActivated: mainWindow.selectTab(3) }
+    Shortcut { sequence: "Ctrl+5"; onActivated: mainWindow.selectTab(4) }
+    Shortcut { sequence: "Ctrl+6"; onActivated: mainWindow.selectTab(5) }
     Shortcut { sequence: "Ctrl+I"; onActivated: mainWindow.infoOpen = !mainWindow.infoOpen }
 
     // -------------------------------------------------------- blocked download

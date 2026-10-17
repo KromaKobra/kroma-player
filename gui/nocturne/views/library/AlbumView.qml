@@ -148,6 +148,7 @@ Item {
         menuAlertTooltip: "This album's tracks and cover do not all agree"
         contributors: root.contributors
 
+        backTooltip: "Back to Albums"
         onBackRequested: root.done()
         onContributorClicked: function (id) { root.openArtistRequested(id) }
         onPlayRequested: playerVM.replaceQueueAndPlayEntries(table.entriesFor(albumTracksVM.trackIds()))

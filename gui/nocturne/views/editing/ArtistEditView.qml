@@ -86,6 +86,9 @@ Item {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
+        showBack: true
+        backTooltip: "Back to artist"
+        onBackRequested: root.done()
         title: "Edit artist"
         subtitle: !artistVM.hasArtist ? "Nothing open"
                   : artistVM.isFetching ? "Fetching…"
@@ -104,12 +107,6 @@ Item {
             variant: "filled"
             enabledAction: artistVM.canSave && !artistVM.isFetching
             onClicked: artistVM.save()
-        }
-        AppButton {
-            text: "Back"
-            iconName: "chevronDown"
-            variant: "ghost"
-            onClicked: root.done()
         }
     }
 

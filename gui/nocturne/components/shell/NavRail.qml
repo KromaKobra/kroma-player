@@ -3,6 +3,9 @@ import QtQuick.Controls
 import Nocturne
 
 // Presentation belongs here; navigation and persistence belong to the window.
+// The rail lists tabs only. A page opened inside a tab — an artist, an album,
+// an editor, a playlist — lights that tab rather than adding an entry of its
+// own; the window says which tab is current through `currentIndex`.
 Item {
     id: root
     property int currentIndex: 0
@@ -16,13 +19,6 @@ Item {
     readonly property Item headerToggle: toggleButton
     property bool headerHovered: false
     readonly property bool hovered: sidebarHover.hovered
-    property bool showEdit: false
-    property bool showArtist: false
-    property bool showAlbum: false
-    property string artistLabel: "Artist"
-    property string albumLabel: "Album"
-    property int artistView: 9
-    property int albumView: 11
 
     readonly property real minimumExpandedWidth: 200
     readonly property real collapsedWidth: 64
@@ -51,12 +47,8 @@ Item {
         { view: 3, icon: "navPlaylist", label: "Playlists" },
         { view: 8, icon: "navImport", label: "Import", group: "Tools" }
     ]
-    readonly property var openItems: []
-        .concat(showArtist ? [{ view: artistView, icon: "navArtist", label: artistLabel }] : [])
-        .concat(showAlbum ? [{ view: albumView, icon: "navAlbum", label: albumLabel }] : [])
-        .concat(showEdit ? [{ view: 7, icon: "edit", label: "Edit track" }] : [])
     readonly property var settingsItem: ({ view: 5, icon: "navSettings", label: "Settings" })
-    readonly property var items: mainItems.concat(openItems).concat([settingsItem])
+    readonly property var items: mainItems.concat([settingsItem])
     readonly property int currentSlot: {
         for (var i = 0; i < items.length; ++i)
             if (isSelected(items[i])) return i
@@ -216,11 +208,6 @@ Item {
                     Heading { text: modelData.group || ""; visible: text !== "" }
                     Destination { entry: modelData }
                 }
-            }
-            Heading { text: "Open pages"; visible: root.openItems.length > 0 }
-            Repeater {
-                model: root.openItems
-                delegate: Destination { required property var modelData; entry: modelData }
             }
             Heading { text: "Pinned" }
         }

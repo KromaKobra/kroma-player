@@ -241,28 +241,39 @@ class PlaylistRepository(BaseRepository[Playlist]):
                 .one()
             )
 
-            cover_hash = pl.cover_hash
-            if not cover_hash:
-                first = (
-                    self.session.query(Track.cover_hash)
-                    .join(PlaylistTrack, PlaylistTrack.track_id == Track.id)
-                    .filter(
-                        PlaylistTrack.playlist_id == pl.id,
-                        Track.cover_hash.isnot(None),
-                    )
-                    .order_by(PlaylistTrack.position.asc())
-                    .first()
-                )
-                cover_hash = first[0] if first else None
-
             summaries.append({
                 "id": pl.id,
                 "name": pl.name,
                 "description": pl.description or "",
-                "cover_hash": cover_hash,
+                "cover_hash": self._resolve_cover_hash(pl),
                 "track_count": int(count or 0),
                 "total_duration": int(duration or 0),
                 "created_at": pl.created_at,
                 "updated_at": pl.updated_at,
             })
         return summaries
+
+    def get_cover_hash(self, playlist_id: int) -> Optional[str]:
+        """Return one playlist's resolved cover hash, as its summary would.
+
+        For the open playlist's header, which would otherwise have to build
+        every playlist's summary to read one cover.
+        """
+        playlist = self.get_by_id(playlist_id)
+        return self._resolve_cover_hash(playlist) if playlist else None
+
+    def _resolve_cover_hash(self, playlist: Playlist) -> Optional[str]:
+        """The playlist's own cover if set, otherwise its first track's artwork."""
+        if playlist.cover_hash:
+            return playlist.cover_hash
+        first = (
+            self.session.query(Track.cover_hash)
+            .join(PlaylistTrack, PlaylistTrack.track_id == Track.id)
+            .filter(
+                PlaylistTrack.playlist_id == playlist.id,
+                Track.cover_hash.isnot(None),
+            )
+            .order_by(PlaylistTrack.position.asc())
+            .first()
+        )
+        return first[0] if first else None

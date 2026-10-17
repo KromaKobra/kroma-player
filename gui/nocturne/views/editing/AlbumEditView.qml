@@ -79,6 +79,9 @@ Item {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
+        showBack: true
+        backTooltip: "Back to album"
+        onBackRequested: root.done()
         title: "Edit album"
         subtitle: !albumVM.hasAlbum ? "Nothing open"
                   : albumVM.unifyTotal > 0 && albumVM.isBusy
@@ -99,12 +102,6 @@ Item {
             variant: "filled"
             enabledAction: albumVM.canSave && !albumVM.isBusy
             onClicked: albumVM.save()
-        }
-        AppButton {
-            text: "Back"
-            iconName: "chevronDown"
-            variant: "ghost"
-            onClicked: root.done()
         }
     }
 

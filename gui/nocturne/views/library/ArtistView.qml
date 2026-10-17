@@ -21,7 +21,7 @@ Item {
     property bool active: false
     property var columnLayouts: null
 
-    // Forwarded up to the window, which owns navigation to the hidden pages.
+    // Forwarded up to the window, which owns navigation.
     signal done()
     signal editArtistRequested(int artistId)
     signal editTrackRequested(int trackId)
@@ -84,6 +84,7 @@ Item {
         menuAlert: artistVM.needsAttention
         menuAlertTooltip: "This name looks like more than one artist"
 
+        backTooltip: "Back to Artists"
         onBackRequested: root.done()
         onPlayRequested: playerVM.replaceQueueAndPlayEntries(table.entriesFor(artistTracks.trackIds()))
         onShuffleRequested: playerVM.replaceQueueAndPlayEntries(

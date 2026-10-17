@@ -8,9 +8,9 @@ import "../../components/controls"
 import "../../components/dialogs"
 import "../../components/editing"
 
-// One track's metadata, editable. Not in the navigation rail: you arrive by
-// choosing Edit on a track — from its context menu or from the details panel —
-// and the slot goes away again once there is nothing unsaved left to lose.
+// One track's metadata, editable. Opens inside the Songs tab: you arrive by
+// choosing Edit on a track — from its context menu or from the details panel,
+// wherever that track was listed — and the back arrow returns to the songs.
 //
 // Single-track on purpose. The page is where the per-track tools belong, and
 // "detect this track's key" or "pitch this track down" have no batch meaning,
@@ -20,7 +20,8 @@ Item {
 
     property bool active: false
 
-    // Back out to wherever the user came from.
+    // Up a level, to the Songs tab's list. History is the way back to wherever
+    // the user came from.
     signal done()
 
     // A chip in the artists field was pressed. Navigation belongs to the window.
@@ -141,6 +142,9 @@ Item {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
+        showBack: true
+        backTooltip: "Back to Songs"
+        onBackRequested: root.done()
         title: "Edit track"
         subtitle: !editVM.hasTrack ? "Nothing open"
                   : editVM.isFetching ? "Fetching from " + editVM.refreshLabel + "…"
@@ -166,13 +170,6 @@ Item {
                 else
                     editVM.save()
             }
-        }
-        AppButton {
-            anchors.verticalCenter: parent.verticalCenter
-            text: "Back"
-            iconName: "chevronDown"
-            variant: "ghost"
-            onClicked: root.done()
         }
     }
 

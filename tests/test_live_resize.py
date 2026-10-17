@@ -19,8 +19,8 @@ from PySide6.QtCore import Q_ARG, QMetaObject, QPoint, QPointF, Qt, QUrl
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickItem
 from PySide6.QtTest import QTest
-from test_hidden_tabs import gui as application_gui  # noqa: F401 (fixture)
-from test_hidden_tabs import _call
+from test_tab_navigation import gui as application_gui  # noqa: F401 (fixture)
+from test_tab_navigation import _call
 
 GUI = Path(__file__).resolve().parents[1] / "gui" / "nocturne"
 PLAYLISTS_VIEW_INDEX = 3

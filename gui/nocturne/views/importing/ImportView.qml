@@ -11,12 +11,11 @@ import "../../components/tracks"
 // it is, not by what the page was last asked to do, so a folder and a CSV can
 // be gathered up and taken in a single press.
 //
-// Not in the navigation rail. You arrive by choosing a source on the Library
-// page, or by pairing a web result with a file you already have, and the page
-// keeps its slot for as long as the run has anything left to show. Import used
-// to live inside the Library page and swap that page's track list out from
-// under it — a whole feature borrowing another one's surface. It is its own
-// destination now, so neither has to make room for the other.
+// The Import tab, under Tools in the rail. You also arrive by choosing a source
+// on the Library page, or by pairing a web result with a file you already
+// have. Import used to live inside the Library page and swap that page's track
+// list out from under it — a whole feature borrowing another one's surface. It
+// is its own destination now, so neither has to make room for the other.
 Item {
     id: root
 

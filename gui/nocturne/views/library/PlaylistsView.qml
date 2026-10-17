@@ -4,28 +4,36 @@ import Nocturne
 import "../../components/controls"
 import "../../components/dialogs"
 import "../../components/library"
+import "../../components/shell"
 import "../../components/tracks"
 
-// The playlist collection opens into a detail page with its own hero.
+// The Playlists tab: the collection, and a playlist opened inside it with its
+// own hero. Which one is up is the window's call, as it is for every tab, so a
+// playlist is a history entry like an artist or an album. This page only asks.
 Item {
     id: root
 
     property bool active: false
     property var columnLayouts: null
 
-    // Forwarded up to the window, which owns navigation to the hidden pages.
+    // Forwarded up to the window, which owns navigation.
     signal generateBackingRequested(var trackIds)
     signal editTrackRequested(int trackId)
+    signal openPlaylistRequested(int playlistId)
+    // The back arrow: up from the playlist to the collection.
+    signal done()
+
+    // The open playlist, or -1 for the collection. Set through open() and
+    // back(), which the window calls from its navigate().
     property int openId: -1
+    // Which way the window's current navigation goes — see StackSlide.
+    property int stackDirection: 0
 
-    // The cover travels with the click. playlistsVM exposes no row accessors,
-    // and reading it back by Qt role number would hardcode a private detail.
-    property string _openCoverHash: ""
-
-    function open(playlistId, coverHash) {
+    function open(playlistId) {
+        // The window has usually just loaded it, to check it still exists.
+        if (playlistTracksVM.playlistId !== playlistId)
+            playlistTracksVM.load(playlistId)
         openId = playlistId
-        _openCoverHash = String(coverHash || "")
-        playlistTracksVM.load(playlistId)
     }
     function back() {
         openId = -1
@@ -39,8 +47,11 @@ Item {
 
     Connections {
         target: playlistsVM
+        // Opened when it was made here. One made from Add to playlist,
+        // somewhere else, must not change what this tab is showing behind it.
         function onPlaylist_created(playlistId) {
-            root.open(playlistId, "")
+            if (root.active)
+                root.openPlaylistRequested(playlistId)
         }
     }
 
@@ -52,6 +63,7 @@ Item {
         visible: opacity > 0
         opacity: root.openId < 0 ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.prefs.reducedMotion ? 0 : Theme.normal } }
+        transform: StackSlide { current: root.openId < 0; direction: root.stackDirection }
 
         LibraryHeader {
             id: gridHeader
@@ -83,9 +95,9 @@ Item {
             onCreateRequested: createDialog.openBlank()
             contextMenu: cellMenu
             onContextRequested: function(entity) {
-                root._armMenu(entity.id, entity.name, entity.coverHash, entity.trackCount, false)
+                root._armMenu(entity.id, entity.name, entity.trackCount)
             }
-            delegate: PlaylistDelegate { onActivated: root.open(Number(playlistId), coverHash) }
+            delegate: PlaylistDelegate { onActivated: root.openPlaylistRequested(Number(playlistId)) }
             emptyIcon: "playlist"
             emptyTitle: "No playlists yet"
             emptyDescription: "Group tracks however you like — by mood, by set, by anything."
@@ -102,21 +114,16 @@ Item {
     // entry points cannot drift apart.
     property int _menuId: -1
     property string _menuName: ""
-    property string _menuCover: ""
     property int _menuCount: 0
-    property bool _menuInDetail: false
 
-    function _armMenu(id, name, cover, count, inDetail) {
+    function _armMenu(id, name, count) {
         _menuId = id
         _menuName = String(name || "")
-        _menuCover = String(cover || "")
         _menuCount = Number(count) || 0
-        _menuInDetail = !!inDetail
     }
 
     function _openDetailMenu() {
-        _armMenu(openId, playlistTracksVM.playlistName, _openCoverHash,
-                 detailTable.count, true)
+        _armMenu(openId, playlistTracksVM.playlistName, detailTable.count)
         cellMenu.entries = playlistsVM.playbackEntries([openId])
         cellMenu.selectionCount = 1
         cellMenu.inDetail = true
@@ -127,7 +134,7 @@ Item {
         id: cellMenu
         objectName: "playlistCollectionMenu"
         playlist: true
-        onOpenRequested: root.open(root._menuId, root._menuCover)
+        onOpenRequested: root.openPlaylistRequested(root._menuId)
         onRenameRequested: createDialog.openRename(root._menuId, root._menuName)
         onExportRequested: exportDialog.openFor(root._menuId, root._menuName, root._menuCount)
         onDeleteRequested: confirmDeletePlaylist.open()
@@ -141,6 +148,7 @@ Item {
         visible: opacity > 0
         opacity: root.openId >= 0 ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.prefs.reducedMotion ? 0 : Theme.normal } }
+        transform: StackSlide { current: root.openId >= 0; direction: root.stackDirection }
 
         // The same banner the artist and album pages wear — see DetailHero.
         DetailHero {
@@ -151,16 +159,16 @@ Item {
 
             kicker: "PLAYLIST"
             title: playlistTracksVM.playlistName
-            coverHash: root._openCoverHash
+            coverHash: playlistTracksVM.coverHash
             trackCount: detailTable.count
             totalDuration: playlistTracksVM.totalDuration
             canPlay: detailTable.count > 0
             canShuffle: detailTable.count > 1
             showExport: true
             canExport: detailTable.count > 0
-            backTooltip: "Back to playlists"
+            backTooltip: "Back to Playlists"
 
-            onBackRequested: root.back()
+            onBackRequested: root.done()
             onPlayRequested: playerVM.replaceQueueAndPlayEntries(detailTable.entriesFor(playlistTracksVM.trackIds()))
             onShuffleRequested: playerVM.replaceQueueAndPlayEntries(
                                     detailTable.entriesFor(hero.shuffled(playlistTracksVM.trackIds())))
@@ -218,7 +226,7 @@ Item {
         danger: true
         onConfirmed: {
             if (root.openId === root._menuId)
-                root.back()
+                root.done()
             playlistsVM.deletePlaylist(root._menuId)
         }
     }
