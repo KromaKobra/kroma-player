@@ -15,8 +15,13 @@ import pytest
 from sqlalchemy import event as sa_event
 
 # Must be set before any Qt application is constructed, so the QML tests can
-# build a real engine without needing a display.
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+# build a real engine without needing a display. Forced, not defaulted: a
+# desktop session commonly exports QT_QPA_PLATFORM, and real windows under a
+# compositor get tiled and steal focus, failing geometry and input tests for
+# reasons that have nothing to do with the code. Opt in to real windows only
+# to chase a window-manager bug: KROMA_TEST_ONSCREEN=1 pytest tests/...
+if os.environ.get("KROMA_TEST_ONSCREEN") != "1":
+    os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
 # Read by app.utils.library_paths: it turns the "fall back to the configured
 # vault" behaviour into a hard error, so an unset library root can never quietly
