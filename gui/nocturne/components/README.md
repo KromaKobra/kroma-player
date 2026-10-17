@@ -57,6 +57,10 @@ row positions through one batched model call per selection or structural change;
 `LibraryCard` joins the fill and squares corners along selected physical neighbors.
 Column changes recompute adjacency from the cache, and scrolling performs no
 selection queries. Diagonal entries and entries across row boundaries stay separate.
+`LibraryReflow` keeps grid layout changes continuous with interruptible, critically
+damped translation and scale springs. The grid commits geometry once; animation
+does not relayout content or resize artwork masks each frame. Only visible entries
+animate, and initialization, pooling and Reduce motion reset presentation in place.
 Collection tables reuse the track column header/catalog/layout with separate
 `artistCollection`, `albumCollection`, and `playlistCollection` preference keys.
 Index, artwork and name remain pinned; data columns can sort, resize, move and hide.

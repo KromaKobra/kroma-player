@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Window
 import QtQuick.Controls
 import Nocturne
 import "../artwork"
@@ -61,6 +62,15 @@ FocusScope {
     }
     width: view ? view.cellWidth : 0
     height: view ? view.cellHeight : 0
+    transform: [reflow.resizing, reflow.translation]
+    LibraryReflow {
+        id: reflow
+        target: root
+        view: root.view
+        active: root.visible && !root.pooled && !root.listMode && root.view !== null
+                && root.Window.window && root.Window.window.visible
+                && !Theme.prefs.reducedMotion
+    }
     activeFocusOnTab: true
     Accessible.role: Accessible.ListItem
     Accessible.name: displayTitle + ", " + subtitle
@@ -78,7 +88,7 @@ FocusScope {
     ListView.onPooled: pooled = true
     ListView.onReused: pooled = false
     GridView.onPooled: pooled = true
-    GridView.onReused: pooled = false
+    GridView.onReused: { reflow.prepare(); pooled = false }
 
     Rectangle {
         objectName: "entrySelectionBackground"
